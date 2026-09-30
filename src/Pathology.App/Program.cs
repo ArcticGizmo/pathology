@@ -25,6 +25,11 @@ internal static class Program
         if (args.Length > 0 && args[0] == "snapshot")
             return SnapshotCommand.Run(args.Length > 1 ? args[1] : null);
 
+        // `pathology scan [--redact] [--details] [--from file]` diagnoses this machine (read-only, no network) and prints
+        // the findings. A dev and verification aid; exit code = Critical + High problems.
+        if (args.Length > 0 && args[0] == "scan")
+            return ScanCommand.Run(args[1..]);
+
         // `pathology check-update` runs the notify-only update check and prints the result — a headless
         // probe of the same path the UI uses on launch (honours PATHOLOGY_UPDATE_FEED).
         if (args.Length > 0 && args[0] == "check-update")

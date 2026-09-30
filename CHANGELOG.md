@@ -17,5 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   UNC shares and mapped drives. Off means no stranger's server gets a look at your password hash.
 - **`pathology snapshot`** — writes a redacted snapshot of this machine's PATH for bug reports, and refuses
   to write at all if anything identifying survives the redaction.
+- **`pathology scan`** — 23 checks for what's wrong with your PATH, worst first, each with what, why and how
+  to fix it. `--redact` makes the output fit to paste somewhere. The app's pages catch up in a later release.
 
 ---

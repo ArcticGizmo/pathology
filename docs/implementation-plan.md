@@ -225,62 +225,98 @@ Everything here is **read-only and side-effect free**: no test files, no directo
 
 ## Milestone 2 — Symptom detectors
 
-Each detector is a pure `IDetector.Detect(PathSnapshot) → IEnumerable<Finding>` in its own type, with
-fixture-backed tests (a positive case, a negative case and an edge case at minimum).
+Each detector is a pure `IDetector.Detect(DetectionContext) → IEnumerable<Finding>` in its own type, with
+fixture-backed tests (a positive case, a negative case and an edge case at minimum). *`DetectionContext`
+wraps the snapshot with what every rule needs worked out once (entries resolved through links, the System32
+position, whether you're an admin, the shadow report), so it's still a pure function of the snapshot.*
+`Diagnoser.Diagnose` runs them all, ranks the findings and groups them by root cause (`FindingGroup`, led by
+its worst member).
 
 `Finding`: stable ID, category (Security / Correctness / Hygiene), severity (Critical / High / Medium /
 Low / Info), scope, affected entries, the perspectives it applies to, a **root-cause key** (for
-deduplication), and `What` / `Why` / `Fix` text. In v1.0 the fix is advisory only.
+deduplication), and `What` / `Why` / `Fix` text. In v1.0 the fix is advisory only. *Also `Evidence` (the
+granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep links. `Key` = rule + subject.*
+
+> **Done 2026-09-30.** 241 Core + 33 Windows tests. Tests use `TestMachine`, a DSL that describes a made-up
+> machine and runs it through the real capturer, rather than committed JSON fixtures. Checked against this
+> machine through `pathology scan --redact`: every finding above Info traced to a real cause; the false
+> positives that turned up (CFG-01/02 on repeats Windows drops, COR-03 on Windows' own trailing `;`, a
+> redaction bug that re-cased entry keys) are fixed and tested.
 
 ### Security
-- [ ] `SEC-01` Machine PATH dir writable by non-admin principals → **Critical** (System perspective victim,
-      StandardUser attacker)
-- [ ] `SEC-02` Dir owned by a non-admin (implicit `WRITE_DAC`) → **High**; the fix text includes an ownership reset
-- [ ] `SEC-03` Missing machine dir whose nearest existing ancestor is creatable by non-admins (phantom dir) → **Critical**
-- [ ] `SEC-04` Writable entry ordered before `%SystemRoot%\System32` / `%SystemRoot%` → separate **shadowing
+- [x] `SEC-01` Machine PATH dir writable by non-admin principals → **Critical** (System perspective victim,
+      StandardUser attacker). *Writable only by you: **Critical** for a standard user (an escalation), **High**
+      for an admin (a UAC bypass). Write access that comes only from ownership is left to SEC-02.*
+- [x] `SEC-02` Dir owned by a non-admin (implicit `WRITE_DAC`) → **High**; the fix text includes an ownership reset.
+      *Critical when the owner is a group every user is in; skipped when an `OWNER RIGHTS` ACE caps the owner.*
+- [x] `SEC-03` Missing machine dir whose nearest existing ancestor is creatable by non-admins (phantom dir) → **Critical**
+- [x] `SEC-04` Writable entry ordered before `%SystemRoot%\System32` / `%SystemRoot%` → separate **shadowing
       risk** rating. Uses PATHEXT precedence (`.COM`/`.BAT` beat `.EXE`) to list which built-ins could be shadowed.
-- [ ] `SEC-05` Permissive ACL inherited from a drive root → one root-cause finding covering every affected
-      dir. Its children are grouped under it, not reported one by one.
-- [ ] `SEC-06` User PATH dir writable by *other* users → **Medium**, suggest relocating under the profile
-- [ ] `SEC-07` User-writable dirs reachable from elevated sessions → **UAC exposure summary**
-      (a Medium finding plus a Health panel)
-- [ ] `SEC-08` Junction or symlink whose **target** is writable → assessed against the target and reported
-      at the target's severity, with a "looks safe, isn't" note
-- [ ] `SEC-09` UNC path, mapped drive letter or removable drive → **Medium**, listing the contexts where
+      *High (Medium when only an admin's own session can write it). Shares SEC-01's root cause: one lock-down fixes both.*
+- [x] `SEC-05` Permissive ACL inherited from a drive root → one root-cause finding covering every affected
+      dir. Its children are grouped under it, not reported one by one. *`ProgramData` is a second source (it
+      hands Users write access to its subfolders). Windows, Program Files and the profiles are excluded.*
+- [x] `SEC-06` User PATH dir writable by *other* users → **Medium**, suggest relocating under the profile.
+      *Also a missing user dir that other users could create.*
+- [x] `SEC-07` User-writable dirs reachable from elevated sessions → **UAC exposure summary**
+      (a Medium finding plus a Health panel). *Only for an admin with a split token. **Info** when the only
+      exposed folder is the stock `WindowsApps`, so a fresh install isn't marked down.*
+- [x] `SEC-08` Junction or symlink whose **target** is writable → assessed against the target and reported
+      at the target's severity, with a "looks safe, isn't" note. *Link entries are judged only here, not by SEC-01/06.*
+- [x] `SEC-09` UNC path, mapped drive letter or removable drive → **Medium**, listing the contexts where
       it breaks or is hijackable (SYSTEM doesn't see mapped drives; elevated sessions don't either unless
-      `EnableLinkedConnections` is set)
+      `EnableLinkedConnections` is set). *Also a link to the network and an unmounted drive letter (grouped
+      with its COR-05).*
 
 ### Correctness
-- [ ] `COR-01` Machine PATH references a variable defined only at user scope → **High** (error)
-- [ ] `COR-02` `%VAR%` inside a `REG_SZ` value → **High**; fix: convert to `REG_EXPAND_SZ`
-- [ ] `COR-03` Relative, `.`, or empty entries → **High** (CWD-dependent resolution)
-- [ ] `COR-04` Per-user profile paths in machine PATH → **Medium**; recommend moving to user PATH
-- [ ] `COR-05` Dead / non-existent entries → **Low** (upgraded by `SEC-03` when the phantom condition holds;
-      the two are deduplicated by root-cause key)
-- [ ] `COR-06` Duplicates after normalisation (expansion, case, trailing slash, 8.3) → **Low**; says which copy wins
-- [ ] `COR-07` Competing executables across dirs → **Info** per command, feeding the Shadowing page
-- [ ] `COR-08` Length headroom → **Medium** at ≥ 80% of the limit, **High** at ≥ 95%. Checks the 2047-char
+- [x] `COR-01` Machine PATH references a variable defined only at user scope → **High** (error). *Also a
+      variable nothing defines, in either scope.*
+- [x] `COR-02` `%VAR%` inside a `REG_SZ` value → **High**; fix: convert to `REG_EXPAND_SZ`
+- [x] `COR-03` Relative, `.`, or empty entries → **High** (CWD-dependent resolution). *Empty entries are one
+      **Medium** finding per value: Windows skips them; it's Unix-style shells (Git Bash, MSYS2, Cygwin) that
+      can read them as the current directory. The single trailing `;` is ignored, since Windows writes one itself.*
+- [x] `COR-04` Per-user profile paths in machine PATH → **Medium**; recommend moving to user PATH
+- [x] `COR-05` Dead / non-existent entries → **Low** (upgraded by `SEC-03` when the phantom condition holds;
+      the two are deduplicated by root-cause key). *Also an entry that names a file.*
+- [x] `COR-06` Duplicates after normalisation (expansion, case, trailing slash, 8.3) → **Low**; says which copy wins
+- [x] `COR-07` Competing executables across dirs → **Info**, feeding the Shadowing page. *One finding per
+      (winning folder, hidden folder) pair rather than per command: two JDKs side by side would otherwise
+      be 36 findings.*
+- [x] `COR-08` Length headroom → **Medium** at ≥ 80% of the limit, **High** at ≥ 95%. Checks the 2047-char
       effective-PATH threshold that older tools choke on, the 32,767 env-block limit, and flags the `setx`
       1024 truncation signature (a value exactly 1024 chars long).
 
 ### Hygiene
-- [ ] `HYG-01` Stray quotes → **Low**
-- [ ] `HYG-02` Leading or trailing whitespace → **Low**
-- [ ] `HYG-03` Doubled separators (`;;`) or doubled backslashes → **Low**
-- [ ] `HYG-04` Trailing backslash inconsistency (only as input to duplicate detection) → **Info**
+- [x] `HYG-01` Stray quotes → **Low**
+- [x] `HYG-02` Leading or trailing whitespace → **Low**
+- [x] `HYG-03` Doubled separators (`;;`) or doubled backslashes → **Low**. *Doubled backslashes and forward
+      slashes; `;;` is an empty entry, which COR-03 reports.*
+- [x] `HYG-04` Trailing backslash inconsistency (only as input to duplicate detection) → **Info**
+
+*Each hygiene rule is one finding per value, listing every affected entry: the fix is one edit.*
 
 ### Configured vs effective
-- [ ] `CFG-01` Effective PATH (new process) ≠ expansion of the registry values → **Medium**, with a diff
-- [ ] `CFG-02` Current process / Explorer PATH is stale compared with the registry → **Info** ("sign out or
+- [x] `CFG-01` Effective PATH (new process) ≠ expansion of the registry values → **Medium**, with a diff.
+      *Compared with repeats removed: Windows drops a user entry that repeats a machine one when it builds
+      the new-process PATH, which this machine showed.*
+- [x] `CFG-02` Current process / Explorer PATH is stale compared with the registry → **Info** ("sign out or
       restart Explorer"; M6's `WM_SETTINGCHANGE` broadcast fixes this)
 
 ### Shadowing engine (`Pathology.Core/Shadowing`)
-- [ ] Enumerate each existing dir's files matching `PATHEXT` (captured in the snapshot as file names only)
-- [ ] Resolve each command name the way **cmd** does: walk PATH in order, and within each dir try the
+- [x] Enumerate each existing dir's files matching `PATHEXT` (captured in the snapshot as file names only).
+      *`IDirectoryProbe.ListFiles` → `DirectoryFacts.CommandFiles`, `PATHEXT` plus `.ps1`, entry folders only,
+      never a network folder or one reached through a link to the network.*
+- [x] Resolve each command name the way **cmd** does: walk PATH in order, and within each dir try the
       extensions in PATHEXT order. Note System32 first.
-- [ ] Note where **PowerShell** differs (aliases, functions and cmdlets come before PATH; the `.ps1` handling)
+- [x] Note where **PowerShell** differs (aliases, functions and cmdlets come before PATH; the `.ps1` handling)
       as annotations. Full PowerShell semantics are out of scope.
-- [ ] `ShadowReport`: command → winner + hidden copies + whether the winner's dir is writable
+- [x] `ShadowReport`: command → winner + hidden copies + whether the winner's dir is writable. *Plus
+      `Resolve(name)` for "which python?", `Competing`, `Builtins` and the folders that couldn't be listed.*
+
+### Brought forward from M5
+- [x] `pathology scan [--redact] [--details] [--all] [--from snapshot.json]`: findings grouped by root cause,
+      exit code = Critical + High problems. `--redact` diagnoses the redacted snapshot, so output can be shared.
+      *The score arrives with M3.*
 
 ---
 
@@ -372,7 +408,8 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 
 ### Headless verbs (read-only, as in emuwren)
 - [ ] `pathology scan`: prints findings and the score as plain text; exit code = count of Critical + High.
-      This is a dev and verification aid, **not** the M7 reporting contract.
+      This is a dev and verification aid, **not** the M7 reporting contract. *Findings landed in M2; the score
+      joins them in M3.*
 - [ ] `pathology render <dir>`: every page (plus posed states such as healthy, at risk and empty) to PNG via
       Avalonia.Headless, into `./captures/render`
 - [ ] `pathology check-update`

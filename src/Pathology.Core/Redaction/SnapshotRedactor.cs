@@ -75,6 +75,9 @@ public static class SnapshotRedactor
         return redacted with
         {
             Redacted = true,
+            // A placeholder can change a key's case ("C:\USERS\ALEX" → "C:\Users\<user>"). Keys are compare-only and
+            // upper-cased by definition, so they're restored to that.
+            Entries = redacted.Entries.Select(e => e with { Key = e.Key.ToUpperInvariant() }).ToList(),
             Host = redacted.Host with
             {
                 MachineName = MachinePlaceholder,
