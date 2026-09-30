@@ -35,7 +35,8 @@ internal static class SnapshotCommand
             $"entries: {redacted.EntriesIn(PathScope.Machine).Count()} machine, {redacted.EntriesIn(PathScope.User).Count()} user; " +
             $"directories: {dirs.Count} ({dirs.Count(d => d.Exists)} exist, {dirs.Count(d => d.Status == ProbeStatus.SkippedNetwork)} network skipped, " +
             $"{dirs.Count(d => d.Status == ProbeStatus.Failed)} failed, {dirs.Count(d => d.SecurityError is not null)} unreadable ACLs); " +
-            $"access checks: {dirs.Sum(d => d.Access.Count(a => a.Evaluated))} ok, {dirs.Sum(d => d.Access.Count(a => !a.Evaluated))} failed");
+            $"access checks: {dirs.Sum(d => d.Access.Count(a => a.Evaluated))} ok, {dirs.Sum(d => d.Access.Count(a => !a.Evaluated))} failed; " +
+            $"command files: {dirs.Sum(d => d.CommandFiles?.Count ?? 0)} in {dirs.Count(d => d.CommandFiles is not null)} folders");
         Console.WriteLine($"redacted snapshot written to {Path.GetFullPath(output)}");
         return 0;
     }

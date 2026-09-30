@@ -210,6 +210,29 @@ public sealed class DirectoryProbeTests(ITestOutputHelper output) : IDisposable
     }
 
     [Fact]
+    public void Listing_returns_command_file_names_only_hidden_ones_included()
+    {
+        var path = _tree.Folder("listed");
+        _tree.Folder(@"listed\sub.exe");   // a folder, not a file
+        foreach (var name in new[] { "tool.exe", "run.CMD", "notes.txt", "hidden.bat" })
+            File.WriteAllText(Path.Combine(path, name), "");
+        File.SetAttributes(Path.Combine(path, "hidden.bat"), FileAttributes.Hidden);
+
+        var names = _probe.ListFiles(path, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".EXE", ".CMD", ".BAT" }, false);
+
+        Assert.Equal(["hidden.bat", "run.CMD", "tool.exe"], names!.Order(StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void A_network_folder_is_never_listed()
+    {
+        var started = DateTime.UtcNow;
+
+        Assert.Null(_probe.ListFiles(NetworkTarget + @"\bin", new HashSet<string> { ".EXE" }, false));
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromMilliseconds(500));
+    }
+
+    [Fact]
     public void A_relative_path_is_refused()
     {
         Assert.Equal(ProbeStatus.Failed, _probe.Probe(@"relative\bin", false).Status);

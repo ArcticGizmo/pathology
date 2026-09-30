@@ -80,6 +80,10 @@ internal sealed class FakeProbe : IDirectoryProbe
         return this;
     }
 
+    /// <summary>File names per folder; a folder that isn't listed here lists as empty.</summary>
+    public Dictionary<string, string[]> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<(string Path, IReadOnlySet<string> Extensions)> Listed { get; } = [];
+
     public DirectoryFacts Probe(string path, bool allowNetwork)
     {
         Calls.Add((path, allowNetwork));
@@ -87,6 +91,12 @@ internal sealed class FakeProbe : IDirectoryProbe
         if (path.StartsWith(@"\\", StringComparison.Ordinal) && !allowNetwork)
             return new DirectoryFacts { Path = path, Status = ProbeStatus.SkippedNetwork, Drive = DriveKind.Unc };
         return new DirectoryFacts { Path = path, Status = ProbeStatus.Probed, Drive = DriveKind.Fixed };
+    }
+
+    public IReadOnlyList<string>? ListFiles(string path, IReadOnlySet<string> extensions, bool allowNetwork)
+    {
+        Listed.Add((path, extensions));
+        return (Files.TryGetValue(path, out var names) ? names : []).Where(n => extensions.Contains(Path.GetExtension(n))).ToList();
     }
 }
 

@@ -255,9 +255,46 @@ public class SnapshotCapturerTests
         Assert.Equal(Enum.GetValues<CaptureStep>(), steps.Distinct());
     }
 
+    [Fact]
+    public void Each_existing_entry_folder_lists_its_command_files_by_PATHEXT_plus_ps1()
+    {
+        _probe.Files[@"C:\Tools"] = ["tool.exe", "Tool.BAT", "setup.ps1", "readme.txt", "lib.dll"];
+
+        var snapshot = Capture(new FakeRegistry(@"C:\Tools;C:\Tools\missing"));
+
+        Assert.Equal(["tool.exe", "Tool.BAT", "setup.ps1"], snapshot.FactsFor(@"C:\Tools")!.CommandFiles);
+        Assert.Null(snapshot.FactsFor(@"C:\Tools\missing")!.CommandFiles);
+        // The nearest-ancestor walk found C:\Tools too, but only entry folders are listed, and once each.
+        Assert.Single(_probe.Listed);
+    }
+
+    [Fact]
+    public void Network_and_link_to_network_folders_are_never_listed()
+    {
+        _probe.With(@"C:\ToShare", f => f with { ReparseTarget = @"\\server\share", ReparseTargetIsNetwork = true });
+
+        Capture(new FakeRegistry(@"\\server\share\bin;C:\ToShare;C:\Tools"));
+
+        Assert.Equal([@"C:\Tools"], _probe.Listed.Select(l => l.Path));
+    }
+
+    [Fact]
+    public void Without_PATHEXT_the_Windows_default_is_used()
+    {
+        _env.NewProcess.Remove("PATHEXT");
+
+        Capture(new FakeRegistry(@"C:\Tools"));
+
+        var extensions = Assert.Single(_probe.Listed).Extensions;
+        Assert.Contains(".MSC", extensions);
+        Assert.Contains(".exe", extensions);   // case-insensitive
+        Assert.Contains(".PS1", extensions);
+    }
+
     sealed class ThrowingProbe : IDirectoryProbe
     {
         public DirectoryFacts Probe(string path, bool allowNetwork) => throw new IOException("device error");
+        public IReadOnlyList<string>? ListFiles(string path, IReadOnlySet<string> extensions, bool allowNetwork) => throw new IOException("device error");
     }
 
     /// <summary>Progress&lt;T&gt; posts to a sync context; this reports inline so the order is exact.</summary>

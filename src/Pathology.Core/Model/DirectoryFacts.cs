@@ -91,6 +91,12 @@ public sealed record DirectoryFacts
     /// <summary>One result per perspective, when a security descriptor was captured.</summary>
     public IReadOnlyList<AccessResult> Access { get; init; } = [];
 
+    /// <summary>
+    /// For a PATH entry's folder: the names of the files in it that a bare command could run (extension in
+    /// <c>PATHEXT</c>, or <c>.ps1</c>), for the shadowing engine. Null when the folder wasn't listed.
+    /// </summary>
+    public IReadOnlyList<string>? CommandFiles { get; init; }
+
     [JsonIgnore] public bool IsReparsePoint => Attributes.HasFlag(FileAttributes.ReparsePoint);
 
     /// <summary><c>IO_REPARSE_TAG_MOUNT_POINT</c>: a junction (or a volume mount point).</summary>

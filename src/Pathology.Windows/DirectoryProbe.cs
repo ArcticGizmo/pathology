@@ -127,6 +127,41 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
         return facts;
     }
 
+    /// <summary>Stop listing a folder after this many files: a PATH folder with more is a mistake, not a toolbox.</summary>
+    public const int MaxListedFiles = 20_000;
+
+    public IReadOnlyList<string>? ListFiles(string path, IReadOnlySet<string> extensions, bool allowNetwork)
+    {
+        using var _ = new ErrorModeScope();
+        // Listing opens the folder and goes through a link at the leaf, so the leaf's target is checked too.
+        if (!allowNetwork && (IsNetworkLocation(path) || LinkToNetwork(path, includeLeaf: true, depth: 0) is not null))
+            return null;
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = false,
+            IgnoreInaccessible = true,
+            AttributesToSkip = 0,   // hidden and system files still run
+            MatchType = MatchType.Win32,
+            ReturnSpecialDirectories = false,
+        };
+        try
+        {
+            var names = new List<string>();
+            foreach (var file in new DirectoryInfo(ForWin32(path)).EnumerateFiles("*", options))
+            {
+                if (!extensions.Contains(Path.GetExtension(file.Name))) continue;
+                names.Add(file.Name);
+                if (names.Count >= MaxListedFiles) break;
+            }
+            return names;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return null;
+        }
+    }
+
     static DirectoryFacts SkippedNetwork(DirectoryFacts facts, string note) =>
         facts with { Status = ProbeStatus.SkippedNetwork, Note = note };
 

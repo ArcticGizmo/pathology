@@ -10,6 +10,7 @@ public enum CaptureStep
     ReadingEnvironment,
     ResolvingPerspectives,
     ProbingDirectories,
+    ListingCommands,
     EvaluatingAccess,
     Done,
 }
@@ -20,7 +21,8 @@ public sealed record CaptureProgress(CaptureStep Step, int Completed = 0, int To
 /// <summary>
 /// Takes a <see cref="PathSnapshot"/>: reads the registry and environments, tokenises and expands both PATH
 /// values, probes each directory (plus the nearest existing ancestor of a missing one, and every link
-/// target), and evaluates each captured security descriptor for every perspective.
+/// target), lists the command files in each entry's folder, and evaluates each captured security descriptor
+/// for every perspective.
 /// </summary>
 /// <remarks>
 /// The OS work is behind the reader interfaces, so this orchestration, including the rule that network paths
@@ -37,6 +39,9 @@ public sealed class SnapshotCapturer(
 {
     /// <summary>How many link hops to follow before giving up (a junction loop must not hang a scan).</summary>
     public const int MaxLinkHops = 8;
+
+    /// <summary>What <c>PATHEXT</c> is when nothing sets it (Windows' own default).</summary>
+    public const string DefaultPathExt = ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC";
 
     readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
@@ -62,7 +67,9 @@ public sealed class SnapshotCapturer(
             .Concat(Draft(reg.UserPath, name => Lookup(newProcess, name)))
             .ToList();
 
+        var pathExt = Lookup(newProcess, "PATHEXT") ?? Lookup(reg.MachineVariables, "PATHEXT");
         var directories = ProbeAll(drafts, options, progress, cancel);
+        ListAll(directories, drafts, CommandExtensions(pathExt), options, progress, cancel);
         var evaluated = EvaluateAll(directories, identities, progress, cancel);
 
         var entries = drafts
@@ -93,7 +100,7 @@ public sealed class SnapshotCapturer(
             ],
             EffectivePath = Lookup(newProcess, "Path"),
             ProcessPath = Lookup(current, "Path"),
-            PathExt = Lookup(newProcess, "PATHEXT") ?? Lookup(reg.MachineVariables, "PATHEXT"),
+            PathExt = pathExt,
             Perspectives = identities,
             Entries = entries,
             Directories = evaluated,
@@ -202,6 +209,41 @@ public sealed class SnapshotCapturer(
                 return new DirectoryFacts { Path = path, Status = ProbeStatus.Failed, Note = ex.Message };
             }
         }
+    }
+
+    /// <summary>
+    /// The extensions worth listing: <c>PATHEXT</c>'s (cmd's and the loader's view) plus <c>.ps1</c>, which
+    /// PowerShell also finds on PATH.
+    /// </summary>
+    public static IReadOnlySet<string> CommandExtensions(string? pathExt)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".PS1" };
+        foreach (var ext in (pathExt ?? DefaultPathExt).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (ext.StartsWith('.')) set.Add(ext);
+        return set;
+    }
+
+    /// <summary>List the command files in each existing entry folder (not ancestors or link targets: an entry's
+    /// own listing already goes through its link).</summary>
+    void ListAll(
+        Dictionary<string, DirectoryFacts> facts, List<PathEntry> drafts, IReadOnlySet<string> extensions,
+        CaptureOptions options, IProgress<CaptureProgress>? progress, CancellationToken cancel)
+    {
+        var folders = drafts.Select(e => e.ProbePath).OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(p => facts.TryGetValue(p, out var f) && f is { Status: ProbeStatus.Probed, Exists: true, IsDirectory: true, ReparseTargetIsNetwork: false })
+            .ToList();
+
+        for (var i = 0; i < folders.Count; i++)
+        {
+            cancel.ThrowIfCancellationRequested();
+            progress?.Report(new(CaptureStep.ListingCommands, i, folders.Count));
+            IReadOnlyList<string>? files;
+            try { files = probe.ListFiles(folders[i], extensions, options.ProbeNetworkPaths); }
+            catch (Exception) { files = null; }
+            facts[folders[i]] = facts[folders[i]] with { CommandFiles = files };
+        }
+        progress?.Report(new(CaptureStep.ListingCommands, folders.Count, folders.Count));
     }
 
     List<DirectoryFacts> EvaluateAll(

@@ -51,6 +51,13 @@ public interface IDirectoryProbe
 {
     /// <param name="path">A canonical, fully qualified path (see <see cref="Normalisation.PathText.Canonical"/>).</param>
     DirectoryFacts Probe(string path, bool allowNetwork);
+
+    /// <summary>
+    /// The names of the files directly inside <paramref name="path"/> whose extension is in
+    /// <paramref name="extensions"/> (e.g. <c>.EXE</c>): names only, nothing is opened or read. Null when the folder
+    /// can't be listed, or when listing it would reach the network and <paramref name="allowNetwork"/> is off.
+    /// </summary>
+    IReadOnlyList<string>? ListFiles(string path, IReadOnlySet<string> extensions, bool allowNetwork);
 }
 
 /// <summary>Evaluates a captured security descriptor for one perspective. Never writes or probes.</summary>
