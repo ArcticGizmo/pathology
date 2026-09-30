@@ -322,7 +322,18 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 
 ## Milestone 3 — Health scoring
 
-- [ ] `SeverityWeights`: a single, table-driven, unit-tested source of truth. Starting values:
+> **Done 2026-09-30** (`Scoring/SeverityWeights`, `Scoring/HealthScore`). Points are charged per problem (a
+> root-cause group) at its worst finding's severity and category. The weighted score is **floored**, so 100 means
+> nothing at all to fix (one Low hygiene problem is 99.7 → 99). The hint picks the single problem whose fix lifts
+> the score furthest, and there's none when no single fix helps (two Criticals).
+>
+> **Tuning needed (observed on this machine: 35%, security 0 / correctness 58 / hygiene 98).** Security
+> deductions far exceed 100, so the sub-score is pinned at 0 and fixing any one security problem doesn't move
+> the score. The hint then points at a correctness fix while four Criticals remain. Options to decide on:
+> diminishing points per extra problem of the same severity, a hint that prefers the worst problem and says
+> what it unblocks, or scoring security by its worst problems rather than their sum.
+
+- [x] `SeverityWeights`: a single, table-driven, unit-tested source of truth. Starting values:
 
   | Severity | Points per finding (after root-cause dedup) |
   |---|---|
@@ -332,15 +343,18 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
   | Low | 2 |
   | Info | 0 |
 
-- [ ] Sub-score per category = `max(0, 100 − Σ points in category)`
-- [ ] Overall = Security 50% + Correctness 35% + Hygiene 15%, then:
-  - [ ] **any Critical → cap at 49**
-  - [ ] any High → cap at 79
-- [ ] Bands: **90–100 Healthy** (Nord14 green) · **70–89 Fair** (Nord13) · **50–69 Needs attention**
-      (Nord12) · **0–49 At risk** (Nord11)
-- [ ] `HealthScore` also carries the counts by severity, the top N findings, and an "if you fixed X, you'd reach Y%" hint
+- [x] Sub-score per category = `max(0, 100 − Σ points in category)`
+- [x] Overall = Security 50% + Correctness 35% + Hygiene 15%, then:
+  - [x] **any Critical → cap at 49**
+  - [x] any High → cap at 79
+- [x] Bands: **90–100 Healthy** (Nord14 green) · **70–89 Fair** (Nord13) · **50–69 Needs attention**
+      (Nord12) · **0–49 At risk** (Nord11). *`HealthBand` in Core; the colours are M4's.*
+- [x] `HealthScore` also carries the counts by severity, the top N findings, and an "if you fixed X, you'd reach Y%" hint
       (the score recomputed without the highest-weight root cause). That hint is the hook that draws people in.
-- [ ] Tests: the caps, the dedup (one drive-root cause over five dirs costs once), clamping, and band edges
+      *Counts and top N are per problem. Also `Uncapped` and `CappedBy`, so the UI can say "held at 49 by a
+      critical problem".*
+- [x] Tests: the caps, the dedup (one drive-root cause over five dirs costs once), clamping, and band edges
+- [x] *`pathology scan` prints the score, the sub-scores, any cap and the hint.*
 
 ---
 

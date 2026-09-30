@@ -2,6 +2,7 @@ using Pathology.Core.Capture;
 using Pathology.Core.Detection;
 using Pathology.Core.Model;
 using Pathology.Core.Redaction;
+using Pathology.Core.Scoring;
 
 namespace Pathology.App.Cli;
 
@@ -51,6 +52,20 @@ internal static class ScanCommand
         Console.WriteLine($"PATHology scan: {snapshot.EntriesIn(PathScope.Machine).Count()} machine and " +
                           $"{snapshot.EntriesIn(PathScope.User).Count()} user entries, {diagnosis.Shadows.All.Count} commands" +
                           (snapshot.Redacted ? " (redacted)" : ""));
+
+        var score = HealthScorer.Score(diagnosis);
+        var band = score.Band switch
+        {
+            HealthBand.Healthy => "healthy",
+            HealthBand.Fair => "fair",
+            HealthBand.NeedsAttention => "needs attention",
+            _ => "at risk",
+        };
+        Console.WriteLine($"Health: {score.Overall}% ({band}). Security {score.Categories[FindingCategory.Security]}, " +
+                          $"correctness {score.Categories[FindingCategory.Correctness]}, hygiene {score.Categories[FindingCategory.Hygiene]}" +
+                          (score.CappedBy is { } cap ? $"; held at {score.Overall} by a {cap.ToString().ToLowerInvariant()} problem (would be {score.Uncapped})" : ""));
+        if (score.Hint is { } hint)
+            Console.WriteLine($"Fix \"{hint.Problem.Primary.Title}\" to reach {hint.Reaches}%.");
         Console.WriteLine();
 
         foreach (var group in diagnosis.Groups)
