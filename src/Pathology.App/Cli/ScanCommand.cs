@@ -9,7 +9,7 @@ namespace Pathology.App.Cli;
 /// <summary>
 /// <c>pathology scan [--redact] [--details] [--all] [--from snapshot.json]</c>: diagnose this machine (or a saved snapshot)
 /// and print the findings as plain text, grouped by root cause. Read-only and never probes the network. A dev
-/// and verification aid, not the M7 reporting contract. The exit code is the number of High problems.
+/// and verification aid with no stable output contract (there's no CLI product). The exit code is the number of High problems.
 /// </summary>
 /// <remarks>
 /// <c>--redact</c> scrubs the snapshot before diagnosing it, so the output carries placeholders instead of this

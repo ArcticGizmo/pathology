@@ -57,8 +57,8 @@ PATHology is a Windows PATH health and resolution tool. It diagnoses security an
 
 ## 5. Reporting and fleet use
 
-- Output formats: terminal table, JSON, and HTML report.
-- **Exit codes by severity** for CI and scripting.
+- ~~Output formats: terminal table, JSON, and HTML report.~~ *Not required: no CLI.*
+- ~~**Exit codes by severity** for CI and scripting.~~ *Not required: no CLI.*
 - **Baseline and drift detection** — alert when an installer introduces a bad entry.
 - **Intune / RMM mode** — a paired detection + remediation script for fleet rollout.
 - **Explain mode** — short educational notes on the underlying concepts (DLL search order, PATHEXT precedence, UAC and PATH inheritance) for people learning how this works.

@@ -14,7 +14,7 @@ See **[capabilities.md](capabilities.md)** for the full capability set. This pla
 | Topic | Decision |
 |---|---|
 | **v1.0 scope** | **Read-only diagnosis only.** Discovery, every symptom in capabilities §2, the category ratings, and what/why/fix explanations. Nothing in v1.0 writes to the registry, the file system or ACLs. |
-| **Later milestones** | M6: remediation and safe apply. M7: CLI and reporting. M8: fleet (baseline, drift, Intune). |
+| **Later milestones** | M6: remediation and safe apply. ~~M7: CLI and reporting~~ (not required). M8: fleet (baseline, drift, Intune). |
 | **Health** | *Changed in M3.* Security, Correctness and Hygiene are each rated by their **worst problem**: Clean, Low, Medium or High. No number and no overall verdict. Findings that share a root cause are one problem. Info findings are notes and never rate a category. |
 | **Editing (M6)** | Apply generated fixes, plus light editing: reorder, remove, add, and move an entry between user and machine scope. Every change goes through the same dry-run → diff → backup → apply pipeline. |
 | **Elevation** | The app **always runs unelevated** (`asInvoker`). The SYSTEM and elevated perspectives come from ACL evaluation against synthetic SID sets, so a scan never needs admin. In M6, machine-scope writes go to an elevated helper (the same exe run with a verb), with one UAC prompt per apply batch. |
@@ -412,7 +412,7 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 
 ### Headless verbs (read-only, as in emuwren)
 - [x] `pathology scan`: prints findings and the category ratings as plain text; exit code = count of High
-      problems. This is a dev and verification aid, **not** the M7 reporting contract. *Landed in M2 and M3.*
+      problems. This is a dev and verification aid with no stable output contract. *Landed in M2 and M3.*
 - [ ] `pathology render <dir>`: every page (plus posed states such as clean, all-High and empty) to PNG via
       Avalonia.Headless, into `./captures/render`
 - [ ] `pathology check-update`
@@ -443,10 +443,15 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
       batch; it applies **only** the machine-scope part of a signed/hashed plan file
 - [ ] `CLAUDE.md` rules extended: writers are never invoked from tests or probes (the emuwren rule)
 
-### M7 — CLI and reporting
-- [ ] Console-subsystem companion or `AttachConsole` strategy (a `WinExe` can't write to the console cleanly)
-- [ ] Output formats: terminal table, JSON (a versioned schema), HTML report
-- [ ] A stable **exit-code contract** by highest severity
+### ~~M7 — CLI and reporting~~ (not required)
+
+> **Dropped 2026-09-30: a CLI is not required.** PATHology is a desktop app. The headless verbs that exist
+> (`scan`, `snapshot`, `render`, `check-update`) stay as dev and verification aids, with no stable output or
+> exit-code contract.
+
+- ~~Console-subsystem companion or `AttachConsole` strategy (a `WinExe` can't write to the console cleanly)~~
+- ~~Output formats: terminal table, JSON (a versioned schema), HTML report~~
+- ~~A stable **exit-code contract** by highest severity~~
 
 ### M8 — Fleet
 - [ ] Baseline snapshot + drift detection (diff of two snapshots), alerting when an installer adds a bad entry
@@ -476,5 +481,5 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 2. **No numeric score** (changed in M3): each category is rated by its worst problem, Low / Medium / High,
    with no overall verdict. The planned 30/15/6/2/0 points saturated on a real machine (see M3).
 3. **v1.0 fix text is advisory prose only.** There is no copy-command button; runnable commands arrive with M6.
-4. **Headless `scan` verb ships in v1.0** as a dev and verification aid (emuwren's `doctor` style), ahead of M7.
+4. **Headless `scan` verb ships in v1.0** as a dev and verification aid (emuwren's `doctor` style). There's no CLI beyond it (M7 isn't required).
 5. **No Dependabot.** SHA-pinned actions and NuGet versions are bumped by hand.
