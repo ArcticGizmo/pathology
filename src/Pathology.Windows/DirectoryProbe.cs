@@ -60,7 +60,7 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
         }
 
         if (!allowNetwork && LinkToNetwork(path, includeLeaf: false, depth: 0) is { } via)
-            return SkippedNetwork(facts, $"The path runs through a link to the network ({via}), so it wasn't followed.");
+            return SkippedNetwork(facts, $"The path runs through {via}, which leads to the network or couldn't be inspected, so it wasn't followed.");
 
         var win32 = ForWin32(path);
         if (!GetFileAttributesEx(win32, 0, out var data))
@@ -141,6 +141,10 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
         if (IsNetworkLocation(path)) return path;
         if (PathText.RootOf(path) is not { } root) return path;
 
+        // A local subst drive is walked as the folder it stands for, whose route may pass through a link itself.
+        if (PathText.Classify(path) == PathForm.Absolute && DriveOf(path).Target is { } substituted)
+            return LinkToNetwork(substituted.TrimEnd('\\') + path[2..], includeLeaf, depth + 1) is null ? null : root;
+
         var segments = path[root.Length..].Split('\\', StringSplitOptions.RemoveEmptyEntries);
         var prefix = root.TrimEnd('\\');
         for (var i = 0; i < segments.Length; i++)
@@ -148,13 +152,17 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
             prefix += @"\" + segments[i];
             if (i == segments.Length - 1 && !includeLeaf) break;
 
-            if (!GetFileAttributesEx(ForWin32(prefix), 0, out var data)) return null;   // nothing further exists
+            // A link we can't inspect might lead anywhere, so the route stops there. Only "doesn't exist" (or no
+            // media) means nothing further can be reached; any other failure leaves this component unread.
+            if (!GetFileAttributesEx(ForWin32(prefix), 0, out var data))
+                return Marshal.GetLastPInvokeError() is ERROR_FILE_NOT_FOUND or ERROR_PATH_NOT_FOUND or ERROR_INVALID_NAME
+                    or ERROR_NOT_READY or ERROR_INVALID_DRIVE ? null : prefix;
             if (((FileAttributes)data.FileAttributes & FileAttributes.ReparsePoint) == 0) continue;
 
-            // A link we can't inspect might lead anywhere, so the route stops there.
             using var link = Open(ForWin32(prefix), FILE_READ_ATTRIBUTES, out _);
             if (link is null) return prefix;
-            if (TagOf(link) is not { } tag || !ReparseTags.IsNameSurrogate(tag)) continue;
+            if (TagOf(link) is not { } tag) return prefix;
+            if (!ReparseTags.IsNameSurrogate(tag)) continue;
             if (ReadReparseTarget(link, prefix) is not { } target) return prefix;
             if (LinkToNetwork(target, includeLeaf: true, depth + 1) is not null) return prefix;
         }
@@ -284,7 +292,11 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
             var print = new string((char*)(names + *(ushort*)(buffer + 12)), 0, *(ushort*)(buffer + 14) / 2);
             var name = substitute.Length > 0 ? substitute : print;
 
-            var resolved = relative && PathText.Parent(linkPath) is { } folder ? folder.TrimEnd('\\') + @"\" + name : FromNtPath(name);
+            // A relative target is relative to the link's folder, or to its drive root when it starts with "\".
+            var resolved = !relative ? FromNtPath(name)
+                : name.StartsWith('\\') && PathText.RootOf(linkPath) is { } root ? root.TrimEnd('\\') + name
+                : PathText.Parent(linkPath) is { } folder ? folder.TrimEnd('\\') + @"\" + name
+                : name;
             return PathText.Canonical(PathText.Strip(resolved)) ?? resolved;
         }
         finally { NativeMemory.Free(buffer); }

@@ -49,9 +49,10 @@ public static class SnapshotRedactor
         $@"(?<=\\Users\\)(?!(?:{SharedProfiles})(?:[\\;""]|$))[^\\;""]+",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    // \\host\share, and the device forms \\?\UNC\host\share and \\.\UNC\host\share.
     static readonly Regex UncHost = new(
-        @"(?<=(?:^|[;""\s=])\\\\)(?![?.]\\|<host>)[^\\;""\s]+",
-        RegexOptions.CultureInvariant);
+        @"(?<=(?:^|[;""\s=])\\\\(?:[?.]\\UNC\\)?)(?![?.]\\|<host>)[^\\;""\s]+",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     static readonly Regex OneDriveOrg = new(@"(?<=OneDrive - )(?!<org>)[^\\;""]+", RegexOptions.CultureInvariant);
 

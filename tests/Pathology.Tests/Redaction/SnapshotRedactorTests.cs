@@ -92,6 +92,18 @@ public class SnapshotRedactorTests
         Assert.Equal(@"\\<host>\tools", Redacted.Directories[1].DriveTarget);
     }
 
+    [Theory]
+    [InlineData(@"\\?\UNC\fileserver02\tools", @"\\?\UNC\<host>\tools")]
+    [InlineData(@"\\.\unc\fileserver02\tools", @"\\.\unc\<host>\tools")]
+    [InlineData(@"C:\bin;\\?\UNC\fileserver02\tools", @"C:\bin;\\?\UNC\<host>\tools")]
+    [InlineData(@"\\?\C:\bin;\\?\Volume{00000000-0000-0000-0000-000000000000}\bin", @"\\?\C:\bin;\\?\Volume{00000000-0000-0000-0000-000000000000}\bin")]
+    public void Device_form_UNC_hosts_are_hidden_too(string value, string expected)
+    {
+        var snapshot = Build() with { MachinePath = Build().MachinePath with { Value = value } };
+
+        Assert.Equal(expected, SnapshotRedactor.Redact(snapshot).MachinePath.Value);
+    }
+
     [Fact]
     public void Non_identifying_data_is_unchanged()
     {

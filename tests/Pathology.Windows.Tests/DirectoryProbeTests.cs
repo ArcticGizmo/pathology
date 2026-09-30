@@ -164,6 +164,37 @@ public sealed class DirectoryProbeTests(ITestOutputHelper output) : IDisposable
         Quiet.Same(target, _probe.Probe(link, false).ReparseTarget, "the resolved symlink target");
     }
 
+    [Fact]
+    public void A_root_relative_symlink_resolves_against_its_drive_root()
+    {
+        var target = _tree.Folder("root-target");
+        var link = _tree.PathOf(@"sub2\root-link");
+        _tree.Folder("sub2");
+        if (!_tree.TrySymlink(link, target[2..]))   // "\Users\…\root-target": no drive letter
+        {
+            output.WriteLine("skipped: this machine can't create symlinks unelevated (Developer Mode is off)");
+            return;
+        }
+
+        Quiet.Same(target, _probe.Probe(link, false).ReparseTarget, "the resolved symlink target");
+    }
+
+    [Fact]
+    public void A_folder_on_the_route_that_cannot_be_inspected_stops_the_probe()
+    {
+        // outer\locked\inner, where locked's attributes can't be read (no FILE_READ_ATTRIBUTES on it, no
+        // FILE_LIST_DIRECTORY on outer). locked might be a link to a share, so inner mustn't be opened.
+        var inner = _tree.Folder(@"outer\locked\inner");
+        _tree.SetAcl(inner, $"D:PAI(A;OICI;FA;;;{Me})");
+        _tree.SetAcl(_tree.PathOf(@"outer\locked"), $"D:PAI(A;;0x100020;;;{Me})");
+        _tree.SetAcl(_tree.PathOf("outer"), $"D:PAI(A;;0x100080;;;{Me})");
+
+        var facts = _probe.Probe(inner, false);
+
+        Assert.Equal(ProbeStatus.SkippedNetwork, facts.Status);
+        Assert.False(facts.Exists);
+    }
+
     [Theory]
     [InlineData(NetworkTarget + @"\bin")]
     [InlineData(@"\\?\UNC\pathology-test.invalid\share\bin")]

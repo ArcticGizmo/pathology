@@ -153,14 +153,9 @@ working pipeline.
 Everything here is **read-only and side-effect free**: no test files, no directory creation, no
 `icacls`/`reg` shell-outs.
 
-> **Checkpoint 2026-09-30 (WIP commit on `v1`).** All code below is in and green (153 Core + 29 Windows
-> tests). Still to do before M1 is closed; pick up here:
-> 1. Run `pathology snapshot` once (prints counts only) and `pathology render ./captures/render` to eyeball
->    the new Settings "SCANNING" panel.
-> 2. Check whether the two symlink tests actually ran or returned early ("skipped:" in the test output;
->    they need Developer Mode). The junction tests always run.
-> 3. Add the M1 lines to `CHANGELOG.md` [Unreleased] (network-probe setting, `snapshot` verb).
-> 4. Review the diff once more, then make the final M1 commit.
+> **Closed 2026-09-30.** 157 Core + 31 Windows tests green. On this machine `pathology snapshot` captured 49
+> entries → 55 directories (44 exist) with 176/176 access checks and no leaks. Developer Mode is off here, so
+> the three symlink tests return early (logged "skipped:"); run them on a Developer Mode machine sometime.
 
 ### Model (`Pathology.Core/Model`)
 - [x] `PathScope` (Machine, User), `PathValueKind` (`REG_SZ`, `REG_EXPAND_SZ`). *Named `PathValueKind`, not
@@ -202,7 +197,9 @@ Everything here is **read-only and side-effect free**: no test files, no directo
   - [x] Drive type via `GetDriveType`; mapped letters via `WNetGetConnection`; subst via `QueryDosDevice`
   - [x] **Never touches UNC or network paths by default**: UNC, mapped drives, a subst onto a share, and any
         path whose route passes through a link to one (each component is checked before anything is opened).
-        Opt-in via the new Settings toggle (`ProbeNetworkPaths`, off).
+        Opt-in via the new Settings toggle (`ProbeNetworkPaths`, off). *The route check fails closed: a
+        component it can't read (access denied, unreadable reparse tag) stops the probe, and a local subst
+        drive is walked as the folder it stands for.*
   - [x] Short-name expansion via `GetLongPathName`, only for paths containing `~`
 - [x] `ITokenPerspectives`: current token + `TokenLinkedToken` (either direction, so running elevated works
       too); SYSTEM and a synthetic standard user from fixed SID lists, each with an integrity label SID
@@ -218,8 +215,8 @@ Everything here is **read-only and side-effect free**: no test files, no directo
 - [x] Windows integration tests on temp dirs with crafted ACLs: Users-writable, owner-only, deny-overrides,
       inherited from parent. SDDL-level evaluator tests add OWNER RIGHTS, inherit-only, deny-only
       Administrators and the integrity label.
-- [x] Junction test (always runs); symlink-to-UNC and relative-symlink tests (need Developer Mode, otherwise
-      they return early and log "skipped")
+- [x] Junction test (always runs); symlink-to-UNC, relative and root-relative symlink tests (need Developer
+      Mode, otherwise they return early and log "skipped"); an uninspectable folder on the route stops the probe
 - [x] A snapshot round-trips through JSON; the redactor removes every PII field; a read-only capture of the real
       machine redacts with no leaks. Windows test assertions use `Quiet.Same`, so a failure never prints
       a real path or SID.
