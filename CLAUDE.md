@@ -1,7 +1,7 @@
 # PATHology — working notes
 
 A Windows desktop app that diagnoses the machine and user `PATH` for security and correctness problems,
-scores its health, and explains every finding. Avalonia 12 on .NET 10, in the same shape as `../emuwren`,
+rates its health, and explains every finding. Avalonia 12 on .NET 10, in the same shape as `../emuwren`,
 themed Nord (Dark) via `ArcticGizmo.Avalonia.Palette`, released with Velopack from a `v*` tag.
 
 - **[docs/capabilities.md](docs/capabilities.md)** — what the tool does.

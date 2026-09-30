@@ -2,14 +2,14 @@ using Pathology.Core.Capture;
 using Pathology.Core.Detection;
 using Pathology.Core.Model;
 using Pathology.Core.Redaction;
-using Pathology.Core.Scoring;
+using Pathology.Core.Health;
 
 namespace Pathology.App.Cli;
 
 /// <summary>
 /// <c>pathology scan [--redact] [--details] [--all] [--from snapshot.json]</c>: diagnose this machine (or a saved snapshot)
 /// and print the findings as plain text, grouped by root cause. Read-only and never probes the network. A dev
-/// and verification aid, not the M7 reporting contract. The exit code is the number of Critical and High groups.
+/// and verification aid, not the M7 reporting contract. The exit code is the number of High problems.
 /// </summary>
 /// <remarks>
 /// <c>--redact</c> scrubs the snapshot before diagnosing it, so the output carries placeholders instead of this
@@ -46,26 +46,26 @@ internal static class ScanCommand
         {
             foreach (var f in diagnosis.Findings)
                 Console.WriteLine($"{f.Severity,-8}  {f.Rule}  {f.RootCause}  {f.Title}");
-            return diagnosis.Groups.Count(g => g.Severity >= Severity.High);
+            return HealthRater.Rate(diagnosis).Count(Severity.High);
         }
 
         Console.WriteLine($"PATHology scan: {snapshot.EntriesIn(PathScope.Machine).Count()} machine and " +
                           $"{snapshot.EntriesIn(PathScope.User).Count()} user entries, {diagnosis.Shadows.All.Count} commands" +
                           (snapshot.Redacted ? " (redacted)" : ""));
 
-        var score = HealthScorer.Score(diagnosis);
-        var band = score.Band switch
+        Console.WriteLine();
+        var health = HealthRater.Rate(diagnosis);
+        foreach (var category in health.Categories)
         {
-            HealthBand.Healthy => "healthy",
-            HealthBand.Fair => "fair",
-            HealthBand.NeedsAttention => "needs attention",
-            _ => "at risk",
-        };
-        Console.WriteLine($"Health: {score.Overall}% ({band}). Security {score.Categories[FindingCategory.Security]}, " +
-                          $"correctness {score.Categories[FindingCategory.Correctness]}, hygiene {score.Categories[FindingCategory.Hygiene]}" +
-                          (score.CappedBy is { } cap ? $"; held at {score.Overall} by a {cap.ToString().ToLowerInvariant()} problem (would be {score.Uncapped})" : ""));
-        if (score.Hint is { } hint)
-            Console.WriteLine($"Fix \"{hint.Problem.Primary.Title}\" to reach {hint.Reaches}%.");
+            var counts = new[] { Severity.High, Severity.Medium, Severity.Low }
+                .Where(s => category.Count(s) > 0)
+                .Select(s => $"{category.Count(s)} {Word(s)}");
+            var next = category.IsClean ? ""
+                : $"  (fix {category.Holding.Count()} to reach {(category.AfterHolding is { } after ? Word(after) : "clean")})";
+            Console.WriteLine($"{category.Category.ToString().ToUpperInvariant(),-12} {(category.Rating is { } r ? Word(r).ToUpperInvariant() : "CLEAN"),-7} " +
+                              string.Join(" · ", counts) + next);
+        }
+        if (health.Notes.Count > 0) Console.WriteLine($"{"NOTES",-12} {health.Notes.Count}");
         Console.WriteLine();
 
         foreach (var group in diagnosis.Groups)
@@ -82,9 +82,8 @@ internal static class ScanCommand
             foreach (var line in f.Evidence) Console.WriteLine($"          - {line}");
         }
 
-        var counts = Enum.GetValues<Severity>().Reverse().Select(s => $"{diagnosis.Groups.Count(g => g.Severity == s)} {s.ToString().ToLowerInvariant()}");
-        Console.WriteLine();
-        Console.WriteLine($"{diagnosis.Groups.Count} problems ({diagnosis.Findings.Count} findings): {string.Join(", ", counts)}");
-        return diagnosis.Groups.Count(g => g.Severity >= Severity.High);
+        return health.Count(Severity.High);
     }
+
+    static string Word(Severity severity) => severity == Severity.Info ? "note" : severity.ToString().ToLowerInvariant();
 }

@@ -11,29 +11,31 @@ public class SecurityDetectorTests
     // SEC-01 ------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void SEC01_a_machine_folder_any_user_can_write_is_critical()
+    public void SEC01_a_machine_folder_any_user_can_write_is_high()
     {
         var machine = new TestMachine($@"{Windows};C:\Tools").Folder(@"C:\Tools", f => f.WritableByEveryone());
 
         var finding = machine.Single("SEC-01");
 
-        Assert.Equal(Severity.Critical, finding.Severity);
+        Assert.Equal(Severity.High, finding.Severity);
         Assert.Equal(@"C:\Tools", finding.Subject);
+        Assert.Contains("privilege escalation to SYSTEM", finding.Why);
         Assert.Contains(finding.Evidence, e => e.Contains("Users: create files, create folders"));
         Assert.Contains(Perspective.System, finding.Perspectives);
     }
 
     [Theory]
-    [InlineData(true, Severity.High)]      // an admin could elevate anyway: a UAC bypass
-    [InlineData(false, Severity.Critical)] // a standard user reaching SYSTEM: an escalation
-    public void SEC01_a_machine_folder_only_you_can_write_depends_on_whether_you_are_an_admin(bool admin, Severity expected)
+    [InlineData(true, "without a UAC prompt")]           // an admin could elevate anyway: a UAC bypass
+    [InlineData(false, "privilege escalation to SYSTEM")] // a standard user reaching SYSTEM
+    public void SEC01_a_machine_folder_only_you_can_write_is_explained_by_whether_you_are_an_admin(bool admin, string expected)
     {
         var machine = new TestMachine($@"{Windows};C:\Users\you\tools") { Admin = admin }
             .Folder(@"C:\Users\you\tools", f => f.WritableByYou());
 
         var finding = machine.Single("SEC-01");
 
-        Assert.Equal(expected, finding.Severity);
+        Assert.Equal(Severity.High, finding.Severity);
+        Assert.Contains(expected, finding.Why);
         Assert.Contains(finding.Evidence, e => e.Contains("you: create files"));
     }
 
@@ -53,16 +55,16 @@ public class SecurityDetectorTests
     // SEC-02 ------------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(You, Severity.High)]
-    [InlineData(WellKnownSids.Users, Severity.Critical)]
-    [InlineData(SomeoneElse, Severity.High)]
-    public void SEC02_a_machine_folder_owned_by_a_non_admin_is_flagged(string owner, Severity expected)
+    [InlineData(You)]
+    [InlineData(WellKnownSids.Users)]
+    [InlineData(SomeoneElse)]
+    public void SEC02_a_machine_folder_owned_by_a_non_admin_is_high(string owner)
     {
         var machine = new TestMachine($@"{Windows};C:\Tools").Folder(@"C:\Tools", f => f.OwnedBy(owner));
 
         var finding = machine.Single("SEC-02");
 
-        Assert.Equal(expected, finding.Severity);
+        Assert.Equal(Severity.High, finding.Severity);
         Assert.Contains("setowner Administrators", finding.Fix);
         Assert.Equal("owner:" + @"C:\TOOLS", finding.RootCause);
     }
@@ -92,14 +94,14 @@ public class SecurityDetectorTests
     // SEC-03 ------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void SEC03_a_missing_machine_folder_anyone_can_create_is_a_critical_phantom()
+    public void SEC03_a_missing_machine_folder_anyone_can_create_is_a_high_phantom()
     {
         var machine = new TestMachine($@"{Windows};C:\Android\sdk\platform-tools").Folder(@"C:\", f => f.FoldersCreatableByEveryone());
 
         var diagnosis = machine.Diagnose();
 
         var phantom = Assert.Single(diagnosis.Findings, f => f.Rule == "SEC-03");
-        Assert.Equal(Severity.Critical, phantom.Severity);
+        Assert.Equal(Severity.High,phantom.Severity);
         Assert.Contains(@"C:\", phantom.What);
         // It's the same problem as the dead entry: one group, led by the phantom.
         var group = Assert.Single(diagnosis.Groups, g => g.RootCause == phantom.RootCause);
@@ -160,7 +162,7 @@ public class SecurityDetectorTests
         var diagnosis = machine.Diagnose();
 
         var root = Assert.Single(diagnosis.Findings, f => f.Rule == "SEC-05");
-        Assert.Equal(Severity.Critical, root.Severity);
+        Assert.Equal(Severity.High,root.Severity);
         Assert.Equal(@"C:\", root.Subject);
         Assert.Equal(2, root.Entries.Count);
         // The per-folder SEC-01s are the same problem: one group, led by the root cause.
@@ -254,7 +256,7 @@ public class SecurityDetectorTests
 
         var finding = machine.Single("SEC-08");
 
-        Assert.Equal(Severity.Critical, finding.Severity);
+        Assert.Equal(Severity.High,finding.Severity);
         Assert.Contains("junction", finding.Title);
         Assert.Contains(@"C:\Program Files\Tool\bin → D:\Open", finding.Evidence);
         // The link's own (clean) folder isn't reported as SEC-01.

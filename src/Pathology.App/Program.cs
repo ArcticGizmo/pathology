@@ -26,7 +26,7 @@ internal static class Program
             return SnapshotCommand.Run(args.Length > 1 ? args[1] : null);
 
         // `pathology scan [--redact] [--details] [--from file]` diagnoses this machine (read-only, no network) and prints
-        // the findings. A dev and verification aid; exit code = Critical + High problems.
+        // the findings. A dev and verification aid; exit code = High problems.
         if (args.Length > 0 && args[0] == "scan")
             return ScanCommand.Run(args[1..]);
 

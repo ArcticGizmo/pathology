@@ -15,9 +15,9 @@ PATHology is a Windows PATH health and resolution tool. It diagnoses security an
 
 | Symptom | Why it matters | Outcome |
 |---|---|---|
-| Machine PATH directory writable by non-admin principals (Users, Authenticated Users, Everyone, INTERACTIVE) | SYSTEM services searching PATH for a missing DLL will load a planted one — local privilege escalation to SYSTEM | Critical finding + generated ACL lock-down |
+| Machine PATH directory writable by non-admin principals (Users, Authenticated Users, Everyone, INTERACTIVE) | SYSTEM services searching PATH for a missing DLL will load a planted one — local privilege escalation to SYSTEM | High finding + generated ACL lock-down |
 | Directory owned by a non-admin | The owner has implicit `WRITE_DAC`, so it is effectively writable even when the ACL looks clean | Flag, and include an ownership reset in the fix |
-| Missing directory in machine PATH whose nearest existing ancestor is creatable | Anyone can create the missing folder and plant binaries (phantom-directory hijack) | Critical finding; recommend removal |
+| Missing directory in machine PATH whose nearest existing ancestor is creatable | Anyone can create the missing folder and plant binaries (phantom-directory hijack) | High finding; recommend removal |
 | Writable entry ordered *before* the Windows system directories | cmd and PowerShell resolve bare commands by walking PATH in order, and `.COM`/`.BAT` beat `.EXE` in PATHEXT — built-in commands can be shadowed | Separate "shadowing risk" rating + reorder suggestion |
 | Permissive ACL inherited from the drive root (folders created directly under a drive root) | Identifies the root cause so a single fix covers every affected directory | Report the root cause once rather than per entry; fix at source |
 | User PATH directory writable by *other* users | A shared location outside the profile lets other accounts plant binaries into your sessions | Warning; suggest relocating under the profile |
@@ -41,7 +41,7 @@ PATHology is a Windows PATH health and resolution tool. It diagnoses security an
 
 ## 3. Outcomes
 
-- **Health score** plus severity-ranked findings, each with a plain-language *what / why / fix*.
+- **Health ratings**: Security, Correctness and Hygiene each rated Clean, Low, Medium or High by their worst problem, plus severity-ranked findings, each with a plain-language *what / why / fix*.
 - **Scope recommendations** — which machine entries belong in user scope, which should be removed outright, and which legitimately belong in machine scope but need their ACLs locked down.
 - **Recommended ordering** — Windows directories first, then locked-down directories, with writable locations last.
 - **Generated remediation** — a cleaned PATH value and `icacls` lock-down commands, split into *can apply as you* and *needs admin*.

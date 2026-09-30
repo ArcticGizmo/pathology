@@ -53,12 +53,12 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(AppServices services)
     {
         _health = new PlaceholderPageViewModel("Health", "PATH health",
-            "One number for how safe and tidy this machine's PATH is — and the one fix that moves it most.",
-            "Arrives in M4, once the scanner (M1), detectors (M2) and scoring (M3) exist.",
+            "How safe, correct and tidy this machine's PATH is, each rated by its worst problem.",
+            "Arrives in M4, once the scanner (M1), detectors (M2) and ratings (M3) exist.",
             [
-                "A health ring: 0–100%, capped below 50% while any critical finding stands",
-                "Security, Correctness and Hygiene sub-scores",
-                "The top findings, and how far fixing the worst would lift the score",
+                "Security, Correctness and Hygiene, each rated Clean, Low, Medium or High",
+                "What holds each rating where it is, and what it drops to once that's fixed",
+                "The worst findings first",
                 "UAC exposure, length headroom, and what the scan looked at",
             ]);
         _findings = new PlaceholderPageViewModel("Findings", "Findings",
@@ -109,7 +109,7 @@ public partial class MainWindowViewModel : ViewModelBase
         NavItems.Add(new NavHeaderViewModel("Understand"));
         NavItems.Add(_learn);
 
-        // Land on Health — the score is the front door.
+        // Land on Health — the ratings are the front door.
         _currentPage = _health;
         _health.IsActive = true;
 

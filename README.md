@@ -3,8 +3,8 @@
 **Windows PATH health.** PATHology diagnoses security and correctness problems in the machine and user
 `PATH`, explains why each one matters, and (from a later release) produces safe, reversible fixes.
 
-> **Status: early.** v0.1 is the app shell and release pipeline. Scanning, findings and the health score
-> land over the next milestones — see [docs/implementation-plan.md](docs/implementation-plan.md).
+> **Status: early.** v0.1 is the app shell and release pipeline. Scanning, findings and health ratings work
+> from the command line (`pathology scan`); the app's pages follow — see [docs/implementation-plan.md](docs/implementation-plan.md).
 
 What it will look for — writable machine-PATH folders that SYSTEM searches, phantom directories, entries
 that shadow built-in commands, `%VAR%`s that never expand, duplicates, dead entries, length limits and more

@@ -13,7 +13,7 @@ public interface IDetector
     IEnumerable<Finding> Detect(DetectionContext context);
 }
 
-/// <summary>Findings that share a root cause: one problem, shown and scored once, under its worst finding.</summary>
+/// <summary>Findings that share a root cause: one problem, shown and counted once, under its worst finding.</summary>
 public sealed record FindingGroup(string RootCause, Finding Primary, IReadOnlyList<Finding> Members)
 {
     public Severity Severity => Primary.Severity;

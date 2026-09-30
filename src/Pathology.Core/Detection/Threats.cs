@@ -39,11 +39,12 @@ internal static class Threats
     }
 
     /// <summary>
-    /// How bad a plantable machine-PATH folder is. Anyone → Critical. Only you → Critical if you're a standard
-    /// user (that's an escalation to SYSTEM), High if you're an administrator (a UAC bypass: you could elevate anyway).
+    /// True when planting in a machine-PATH folder is an escalation to SYSTEM: anyone can, or only you can and
+    /// you're a standard user. False when only you can and you're an administrator: a UAC bypass, since you
+    /// could elevate anyway. Either is High; the difference is in how the finding explains it.
     /// </summary>
-    public static Severity MachineSeverity(Attacker attacker, DetectionContext context) =>
-        attacker == Attacker.AnyUser || !context.UserIsAdmin ? Severity.Critical : Severity.High;
+    public static bool IsEscalation(Attacker attacker, DetectionContext context) =>
+        attacker == Attacker.AnyUser || !context.UserIsAdmin;
 
     public static string Who(Attacker attacker) =>
         attacker == Attacker.AnyUser ? "any user on this PC" : "you, without elevating";

@@ -1,7 +1,7 @@
 # PATHology — Implementation plan
 
 A Windows desktop app that diagnoses the machine and user `PATH` for security and correctness problems,
-scores its health, and explains every finding. Avalonia 12 on .NET 10, in the same shape as `../emuwren`,
+rates its health, and explains every finding. Avalonia 12 on .NET 10, in the same shape as `../emuwren`,
 themed Nord (Dark), released with Velopack through a tag-triggered GitHub Actions pipeline hardened the way
 `../perch`'s is.
 
@@ -13,9 +13,9 @@ See **[capabilities.md](capabilities.md)** for the full capability set. This pla
 
 | Topic | Decision |
 |---|---|
-| **v1.0 scope** | **Read-only diagnosis only.** Discovery, every symptom in capabilities §2, the health score, and what/why/fix explanations. Nothing in v1.0 writes to the registry, the file system or ACLs. |
+| **v1.0 scope** | **Read-only diagnosis only.** Discovery, every symptom in capabilities §2, the category ratings, and what/why/fix explanations. Nothing in v1.0 writes to the registry, the file system or ACLs. |
 | **Later milestones** | M6: remediation and safe apply. M7: CLI and reporting. M8: fleet (baseline, drift, Intune). |
-| **Health score** | Start at 100 and subtract weighted points per finding. Findings that share a root cause are deduplicated and cost once. **Any Critical caps the overall score at 49%.** Security, Correctness and Hygiene sub-scores sit under the ring. |
+| **Health** | *Changed in M3.* Security, Correctness and Hygiene are each rated by their **worst problem**: Clean, Low, Medium or High. No number and no overall verdict. Findings that share a root cause are one problem. Info findings are notes and never rate a category. |
 | **Editing (M6)** | Apply generated fixes, plus light editing: reorder, remove, add, and move an entry between user and machine scope. Every change goes through the same dry-run → diff → backup → apply pipeline. |
 | **Elevation** | The app **always runs unelevated** (`asInvoker`). The SYSTEM and elevated perspectives come from ACL evaluation against synthetic SID sets, so a scan never needs admin. In M6, machine-scope writes go to an elevated helper (the same exe run with a verb), with one UAC prompt per apply batch. |
 | **Pages** | Health (landing), Findings, Entries, Shadowing, Learn. Settings and About are pinned to the bottom of the nav, as in emuwren. |
@@ -32,12 +32,12 @@ pathology.slnx
 global.json                       SDK pin (10.0.4xx, rollForward latestFeature)
 .config/dotnet-tools.json         vpk pinned to the Velopack NuGet version
 src/
-  Pathology.Core/                 net10.0, NO Avalonia, NO P/Invoke — pure model + detectors + scoring
+  Pathology.Core/                 net10.0, NO Avalonia, NO P/Invoke — pure model + detectors + ratings
     Model/                        PathSnapshot, PathEntry, DirectoryFacts, Perspective, AccessResult
     Normalisation/                expansion, case, trailing slash, 8.3 → long, hygiene tokeniser
     Detection/                    one IDetector per symptom row, Finding, Severity, RootCause
     Shadowing/                    PATHEXT-aware command resolution + shadow report
-    Scoring/                      HealthScore, weights table, bands
+    Health/                       HealthReport: each category rated by its worst problem
     Learn/                        explain-mode content (embedded markdown)
     Changelog/                    parser (ported from emuwren)
   Pathology.Windows/              net10.0-windows — every OS read sits here, behind Core interfaces
@@ -59,7 +59,7 @@ tools/
 1. **Capture** (`Pathology.Windows`): read everything into an immutable, serialisable `PathSnapshot`. That
    covers raw registry values, env vars at each scope, the effective PATH, and a `DirectoryFacts` for
    every entry and its nearest existing ancestor (including per-perspective `AccessResult`s).
-2. **Evaluate** (`Pathology.Core`): the detectors, shadowing and scoring are pure functions of the snapshot.
+2. **Evaluate** (`Pathology.Core`): the detectors, shadowing and ratings are pure functions of the snapshot.
 
 The benefit is that every detector is unit-tested from JSON fixtures, `render` can pose any machine state,
 and M8's baseline/drift is a diff of two snapshots.
@@ -112,7 +112,8 @@ working pipeline.
       `NavItemActiveBgBrush`, …) and `OnAccentBrush`. A test asserts every key the views use is a built-in.
 - [x] Severity brushes registered as palette-*derived* tokens, so they stay inside the package's WCAG-AA gate:
       `CriticalBrush` (Danger), `HighBrush` (Danger⊕Warning, Nord's aurora orange), `MediumBrush` (Warning),
-      `LowBrush` (Info), `SeverityInfoBrush` (TextMuted), `HealthyBrush` (Success)
+      `LowBrush` (Info), `SeverityInfoBrush` (TextMuted), `HealthyBrush` (Success). *Re-mapped in M3 for three
+      levels: see there.*
 - [x] Port `Styles/Common.axaml`. Hard-coded colours are re-pointed at tokens: the active nav, the primary
       button's text (`OnAccentBrush`), and hover states.
 
@@ -232,8 +233,8 @@ position, whether you're an admin, the shadow report), so it's still a pure func
 `Diagnoser.Diagnose` runs them all, ranks the findings and groups them by root cause (`FindingGroup`, led by
 its worst member).
 
-`Finding`: stable ID, category (Security / Correctness / Hygiene), severity (Critical / High / Medium /
-Low / Info), scope, affected entries, the perspectives it applies to, a **root-cause key** (for
+`Finding`: stable ID, category (Security / Correctness / Hygiene), severity (High / Medium / Low, plus
+Info for notes; *Critical was folded into High in M3*), scope, affected entries, the perspectives it applies to, a **root-cause key** (for
 deduplication), and `What` / `Why` / `Fix` text. In v1.0 the fix is advisory only. *Also `Evidence` (the
 granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep links. `Key` = rule + subject.*
 
@@ -244,12 +245,12 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 > redaction bug that re-cased entry keys) are fixed and tested.
 
 ### Security
-- [x] `SEC-01` Machine PATH dir writable by non-admin principals → **Critical** (System perspective victim,
-      StandardUser attacker). *Writable only by you: **Critical** for a standard user (an escalation), **High**
-      for an admin (a UAC bypass). Write access that comes only from ownership is left to SEC-02.*
+- [x] `SEC-01` Machine PATH dir writable by non-admin principals → **High** (System perspective victim,
+      StandardUser attacker). *Also when only you can write it; the text says whether that's an escalation (you're
+      a standard user) or a UAC bypass (you're an admin). Write access that comes only from ownership is left to SEC-02.*
 - [x] `SEC-02` Dir owned by a non-admin (implicit `WRITE_DAC`) → **High**; the fix text includes an ownership reset.
-      *Critical when the owner is a group every user is in; skipped when an `OWNER RIGHTS` ACE caps the owner.*
-- [x] `SEC-03` Missing machine dir whose nearest existing ancestor is creatable by non-admins (phantom dir) → **Critical**
+      *Skipped when an `OWNER RIGHTS` ACE caps the owner.*
+- [x] `SEC-03` Missing machine dir whose nearest existing ancestor is creatable by non-admins (phantom dir) → **High**
 - [x] `SEC-04` Writable entry ordered before `%SystemRoot%\System32` / `%SystemRoot%` → separate **shadowing
       risk** rating. Uses PATHEXT precedence (`.COM`/`.BAT` beat `.EXE`) to list which built-ins could be shadowed.
       *High (Medium when only an admin's own session can write it). Shares SEC-01's root cause: one lock-down fixes both.*
@@ -315,46 +316,37 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 
 ### Brought forward from M5
 - [x] `pathology scan [--redact] [--details] [--all] [--from snapshot.json]`: findings grouped by root cause,
-      exit code = Critical + High problems. `--redact` diagnoses the redacted snapshot, so output can be shared.
-      *The score arrives with M3.*
+      exit code = High problems. `--redact` diagnoses the redacted snapshot, so output can be shared.
+      *The category ratings arrived with M3.*
 
 ---
 
-## Milestone 3 — Health scoring
+## Milestone 3 — Health ratings
 
-> **Done 2026-09-30** (`Scoring/SeverityWeights`, `Scoring/HealthScore`). Points are charged per problem (a
-> root-cause group) at its worst finding's severity and category. The weighted score is **floored**, so 100 means
-> nothing at all to fix (one Low hygiene problem is 99.7 → 99). The hint picks the single problem whose fix lifts
-> the score furthest, and there's none when no single fix helps (two Criticals).
->
-> **Tuning needed (observed on this machine: 35%, security 0 / correctness 58 / hygiene 98).** Security
-> deductions far exceed 100, so the sub-score is pinned at 0 and fixing any one security problem doesn't move
-> the score. The hint then points at a correctness fix while four Criticals remain. Options to decide on:
-> diminishing points per extra problem of the same severity, a hint that prefers the worst problem and says
-> what it unblocks, or scoring security by its worst problems rather than their sum.
+> **Changed 2026-09-30: ratings, not a score.** The first cut was the planned 0–100 score (points per problem,
+> a 50/35/15 split, caps at 49 and 79). On this machine it came out at 35% with security pinned at 0: the
+> security deductions far exceeded 100, so fixing any one security problem didn't move the number, and the
+> "fix X to reach Y%" hint pointed at a correctness fix while four Criticals stood. The number was replaced with
+> per-category ratings, and the Critical level was folded into High.
 
-- [x] `SeverityWeights`: a single, table-driven, unit-tested source of truth. Starting values:
-
-  | Severity | Points per finding (after root-cause dedup) |
-  |---|---|
-  | Critical | 30 |
-  | High | 15 |
-  | Medium | 6 |
-  | Low | 2 |
-  | Info | 0 |
-
-- [x] Sub-score per category = `max(0, 100 − Σ points in category)`
-- [x] Overall = Security 50% + Correctness 35% + Hygiene 15%, then:
-  - [x] **any Critical → cap at 49**
-  - [x] any High → cap at 79
-- [x] Bands: **90–100 Healthy** (Nord14 green) · **70–89 Fair** (Nord13) · **50–69 Needs attention**
-      (Nord12) · **0–49 At risk** (Nord11). *`HealthBand` in Core; the colours are M4's.*
-- [x] `HealthScore` also carries the counts by severity, the top N findings, and an "if you fixed X, you'd reach Y%" hint
-      (the score recomputed without the highest-weight root cause). That hint is the hook that draws people in.
-      *Counts and top N are per problem. Also `Uncapped` and `CappedBy`, so the UI can say "held at 49 by a
-      critical problem".*
-- [x] Tests: the caps, the dedup (one drive-root cause over five dirs costs once), clamping, and band edges
-- [x] *`pathology scan` prints the score, the sub-scores, any cap and the hint.*
+- [x] Severities are **Low / Medium / High**. `Info` stays as a *note* (competing tools, a stale Explorer
+      PATH, the stock WindowsApps exposure) that never rates a category. What was Critical (any user → SYSTEM)
+      is High; the finding's text still says whether it's an escalation or a UAC bypass.
+- [x] Each category (Security, Correctness, Hygiene) is rated by its **worst problem**: Clean, Low, Medium or
+      High. Nothing is summed, so a pile of small problems never outweighs one serious one, and fixing the
+      worst always shows. **No overall verdict**: the three ratings stand side by side.
+- [x] A problem is a root-cause group, counted once, in its worst finding's category at that finding's severity
+      (a phantom directory that's also a dead entry is one Security problem).
+- [x] `CategoryHealth.Holding`: the problems at the category's rating, i.e. what to fix to lower it.
+      `AfterHolding`: what it drops to once they're fixed. These replace the percentage hint.
+- [x] `HealthReport` / `HealthRater` in `Pathology.Core/Health`, pure over the diagnosis's groups.
+- [x] Tests: worst-not-sum, notes never rate, counts per problem, one drive-root cause over five dirs is one
+      problem, what holds a rating and what it drops to, and a stock Windows PATH is clean.
+- [x] `pathology scan` prints each category's rating, its counts and "fix N to reach …"; the exit code is
+      the number of High problems. On this machine: Security High (9 high · 2 medium), Correctness High
+      (2 high · 1 medium · 3 low), Hygiene Low, 12 notes.
+- [x] Theme: `CriticalBrush` is gone. High → red (Danger), Medium → aurora orange, Low → yellow (Warning),
+      notes → muted, clean → green.
 
 ---
 
@@ -365,23 +357,21 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 
 ### Nav
 - [ ] Brand `pathology` + tagline "windows PATH health"
-- [ ] Section **Diagnose**: Health, Findings (count badge = Critical + High), Entries (entry count), Shadowing
+- [ ] Section **Diagnose**: Health, Findings (count badge = High problems), Entries (entry count), Shadowing
 - [ ] Section **Understand**: Learn
 - [ ] Bottom: update button (when available) → Settings → About (version)
 - [ ] The scan runs on launch and on Re-scan, sharing one snapshot across every page; progress goes into the
       `OperationProgressViewModel` checklist (ported)
 
 ### Health (landing page)
-- [ ] **Score ring**: a custom `HealthRing` control (arc drawn in `Render`), coloured by band, with an animated
-      count-up from 0 on the first scan and a tween on re-scan
-- [ ] Band label + severity summary: "AT RISK · 2 critical · 5 warnings"
-- [ ] Security / Correctness / Hygiene sub-score bars
-- [ ] "Fix the top issue to reach **N%**" hint
-- [ ] Top 3–5 findings as cards (severity glyph, one-line what, scope pill). Clicking one opens Findings
-      filtered to it.
+- [ ] **Three category cards** (Security, Correctness, Hygiene), side by side: the rating as a coloured word
+      (CLEAN / LOW / MEDIUM / HIGH), the counts beneath ("9 high · 2 medium"), and "Fix 9 to bring it to Medium"
+- [ ] Each card's worst problems (up to 3) as rows (severity glyph, one-line title, scope pill). Clicking one
+      opens Findings filtered to it; clicking the card opens Findings filtered to the category.
+- [ ] A notes line under the cards ("12 notes: competing tools and the like"), linking to Findings' Info filter
 - [ ] Panels: **UAC exposure** (`SEC-07`), **Length headroom** (a bar for each limit), **Scan info** (time,
       perspectives evaluated, entry counts, whether UNC probing was skipped)
-- [ ] Empty/healthy state: a celebratory 100% with "Nothing to fix"
+- [ ] Clean state: all three cards green with "Nothing to fix"
 
 ### Findings
 - [ ] Severity-ranked list with filters: severity, category, scope, perspective
@@ -421,17 +411,16 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 ## Milestone 5 — Verification and v1.0 release
 
 ### Headless verbs (read-only, as in emuwren)
-- [ ] `pathology scan`: prints findings and the score as plain text; exit code = count of Critical + High.
-      This is a dev and verification aid, **not** the M7 reporting contract. *Findings landed in M2; the score
-      joins them in M3.*
-- [ ] `pathology render <dir>`: every page (plus posed states such as healthy, at risk and empty) to PNG via
+- [x] `pathology scan`: prints findings and the category ratings as plain text; exit code = count of High
+      problems. This is a dev and verification aid, **not** the M7 reporting contract. *Landed in M2 and M3.*
+- [ ] `pathology render <dir>`: every page (plus posed states such as clean, all-High and empty) to PNG via
       Avalonia.Headless, into `./captures/render`
 - [ ] `pathology check-update`
 
 ### Quality gates
 - [ ] Every detector has fixture tests. Fixtures are **redacted** snapshots captured from real machines,
       re-captured rather than hand-edited.
-- [ ] Score-model tests
+- [x] Rating-model tests (M3)
 - [ ] Render the golden states and review them by eye
 - [ ] Manual test matrix: admin user with UAC on, standard user, and a machine with a deliberately
       writable `C:\Tools` in machine PATH (set up by hand in a VM)
@@ -484,8 +473,8 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 
 1. **Identity**: repo `ArcticGizmo/pathology`, exe `pathology.exe`, packId `Pathology`, product name
    "PATHology", installed to `%LocalAppData%\Pathology`.
-2. **Score weights**: 30/15/6/2/0, category split 50/35/15, Critical cap 49, High cap 79. **Tune them
-   later** against real `scan` and `render` output; they live in one tested table (`SeverityWeights`).
+2. **No numeric score** (changed in M3): each category is rated by its worst problem, Low / Medium / High,
+   with no overall verdict. The planned 30/15/6/2/0 points saturated on a real machine (see M3).
 3. **v1.0 fix text is advisory prose only.** There is no copy-command button; runnable commands arrive with M6.
 4. **Headless `scan` verb ships in v1.0** as a dev and verification aid (emuwren's `doctor` style), ahead of M7.
 5. **No Dependabot.** SHA-pinned actions and NuGet versions are bumped by hand.

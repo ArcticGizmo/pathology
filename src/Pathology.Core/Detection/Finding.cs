@@ -2,17 +2,19 @@ using Pathology.Core.Model;
 
 namespace Pathology.Core.Detection;
 
-/// <summary>How bad a finding is. Ordered, so <c>a &gt; b</c> means "a is worse".</summary>
+/// <summary>
+/// How bad a finding is. Ordered, so <c>a &gt; b</c> means "a is worse". Low, Medium and High are problems;
+/// Info is a note (competing tools, a stale Explorer PATH) that never rates a category.
+/// </summary>
 public enum Severity
 {
     Info,
     Low,
     Medium,
     High,
-    Critical,
 }
 
-/// <summary>Which sub-score a finding counts against.</summary>
+/// <summary>Which category a finding is rated in.</summary>
 public enum FindingCategory
 {
     Security,

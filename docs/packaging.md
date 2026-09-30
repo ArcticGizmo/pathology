@@ -109,9 +109,10 @@ All are **read-only**.
 ```sh
 pathology render <dir>    # every page, the changelog and the update button, to PNG
 pathology check-update    # the launch-time update check, printed
+pathology snapshot [file] # a redacted snapshot of this machine's PATH (counts only on the console)
+pathology scan [--redact] [--details] [--all] [--from file]
+                          # the category ratings and findings as text; exit code = High problems
 ```
-
-`pathology scan` (the findings and score as text) arrives with the scanner.
 
 ## Dev vs installed
 

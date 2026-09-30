@@ -34,7 +34,7 @@ public sealed class InheritedPermissiveAcl : IDetector
             {
                 Rule = Rule,
                 Category = FindingCategory.Security,
-                Severity = machine ? Severity.Critical : Severity.Medium,
+                Severity = machine ? Severity.High : Severity.Medium,
                 Subject = display,
                 RootCause = "inherited:" + key,
                 Title = $"{Words.Count(hits.Count, "PATH folder")} inherit write access for every user from {display}",
@@ -77,13 +77,12 @@ public sealed class MachineFolderWritable : IDetector
             // A WRITE_DAC that comes only from ownership is SEC-02's to explain.
             var attacker = Threats.WhoCanPlant(folder, countOwnership: false);
             if (attacker == Attacker.None) continue;
-            var severity = Threats.MachineSeverity(attacker, context);
 
             yield return new Finding
             {
                 Rule = Rule,
                 Category = FindingCategory.Security,
-                Severity = severity,
+                Severity = Severity.High,
                 Subject = folder.Path,
                 RootCause = Threats.WritableRootCause(context, folder),
                 Title = attacker == Attacker.AnyUser
@@ -92,7 +91,7 @@ public sealed class MachineFolderWritable : IDetector
                 What = $"{Words.Entry(entry)} is in the machine PATH, and {Threats.Who(attacker)} can create files in it.",
                 Why = "Services running as SYSTEM, and every elevated program, search the machine PATH: for commands, and for " +
                       "DLLs they don't find anywhere else first. A file planted here runs with their rights. " +
-                      (severity == Severity.Critical
+                      (Threats.IsEscalation(attacker, context)
                           ? "That's a local privilege escalation to SYSTEM."
                           : "Anything running as you could use it to reach SYSTEM without a UAC prompt."),
                 Fix = "Lock the folder down so only Administrators and SYSTEM can write to it (Users: read & execute). If the " +
@@ -120,32 +119,19 @@ public sealed class FolderOwnedByNonAdmin : IDetector
             if (resolved.ViaLink || resolved.Final is not { Exists: true, OwnerSid: { } owner } folder) continue;
             if (Writability.IsAdministrativeOwner(owner)) continue;
 
-            var others = folder.AccessFor(Perspective.StandardUser);
-            var you = folder.AccessFor(Perspective.CurrentUserUnelevated);
-            Severity severity;
-            if (others is { OwnerInPerspective: true })
-            {
-                if (!others.CanWriteDac) continue;   // an OWNER RIGHTS entry has taken the owner's rights away
-                severity = Severity.Critical;
-            }
-            else if (you is { OwnerInPerspective: true })
-            {
-                if (!you.CanWriteDac) continue;
-                severity = Threats.MachineSeverity(Attacker.You, context);
-            }
-            else
-            {
-                // Another account. Its rights can't be evaluated from here, but an OWNER RIGHTS entry still caps them.
-                if (folder.Sddl?.Contains(";;;OW)", StringComparison.OrdinalIgnoreCase) == true) continue;
-                severity = Severity.High;
-            }
+            // When a perspective holds the owner SID, its evaluated rights say whether an OWNER RIGHTS entry has taken
+            // the implicit WRITE_DAC away. Another account can't be evaluated from here, but the entry still caps it.
+            var holder = new[] { folder.AccessFor(Perspective.StandardUser), folder.AccessFor(Perspective.CurrentUserUnelevated) }
+                .FirstOrDefault(a => a is { OwnerInPerspective: true });
+            if (holder is not null ? !holder.CanWriteDac : folder.Sddl?.Contains(";;;OW)", StringComparison.OrdinalIgnoreCase) == true)
+                continue;
 
             var name = Writability.OwnerName(folder, context);
             yield return new Finding
             {
                 Rule = Rule,
                 Category = FindingCategory.Security,
-                Severity = severity,
+                Severity = Severity.High,
                 Subject = folder.Path,
                 RootCause = "owner:" + PathText.Key(folder.Path),
                 Title = $"{folder.Path} is owned by {name}, not an administrator",
@@ -185,7 +171,7 @@ public sealed class PhantomMachineFolder : IDetector
             {
                 Rule = Rule,
                 Category = FindingCategory.Security,
-                Severity = Threats.MachineSeverity(attacker, context),
+                Severity = Severity.High,
                 Subject = missing.Path,
                 RootCause = Threats.MissingRootCause(missing),
                 Title = $"{missing.Path} doesn't exist, and {Threats.Who(attacker)} could create it",
@@ -234,7 +220,7 @@ public sealed class WritableBeforeSystem32 : IDetector
             var attacker = Threats.WhoCanPlant(folder);
             if (attacker == Attacker.None) continue;
 
-            var severity = attacker == Attacker.AnyUser || !context.UserIsAdmin ? Severity.High : Severity.Medium;
+            var severity = Threats.IsEscalation(attacker, context) ? Severity.High : Severity.Medium;
             var count = builtins.Count == 0 ? "Every Windows command" : $"{Words.Count(builtins.Count, "Windows command")}";
 
             yield return new Finding
@@ -401,7 +387,7 @@ public sealed class WritableLinkTarget : IDetector
             else continue;
 
             Severity severity;
-            if (entry.Scope == PathScope.Machine && attacker != Attacker.None) severity = Threats.MachineSeverity(attacker, context);
+            if (entry.Scope == PathScope.Machine && attacker != Attacker.None) severity = Severity.High;
             else if (entry.Scope == PathScope.User && attacker == Attacker.AnyUser) severity = Severity.Medium;
             else continue;
 

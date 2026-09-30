@@ -19,7 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   to write at all if anything identifying survives the redaction.
 - **`pathology scan`** — 23 checks for what's wrong with your PATH, worst first, each with what, why and how
   to fix it. `--redact` makes the output fit to paste somewhere. The app's pages catch up in a later release.
-- **A health score** out of 100, with security, correctness and hygiene sub-scores and the one fix that would
-  lift it most. A single critical problem holds it under 50, however tidy everything else is.
+- **Health ratings** — security, correctness and hygiene, each rated by its worst problem: clean, low, medium
+  or high. No percentages, so ten tidy-ups can't hide one open door.
 
 ---
