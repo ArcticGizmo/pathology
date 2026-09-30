@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The pure engine: model, detectors, scoring, changelog, settings. No Avalonia and no P/Invoke, so every
+       rule in here is unit-testable from fixtures. Windows reads live in Pathology.Windows (M1). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pathology.Tests" />
+  </ItemGroup>
+
+</Project>

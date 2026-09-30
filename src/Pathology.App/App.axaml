@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:local="clr-namespace:Pathology.App"
+             x:Class="Pathology.App.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://pathology/Styles/Common.axaml" />
+    </Application.Styles>
+
+    <!-- No colours here. The palette (Nord Dark + PATHology's severity tokens) is registered into these
+         resources at startup by Theming/NordTheme.cs, and the engine recolours those brushes in place — so
+         never declare a brush with one of its keys here, or it would shadow the live one. -->
+    <Application.Resources>
+        <!-- Max width of the list pane on master/detail pages; past this only the detail pane grows. -->
+        <sys:Double x:Key="ListPaneMaxWidth">600</sys:Double>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             x:Class="Pathology.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="680" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="20">
+
+            <StackPanel Spacing="3">
+                <TextBlock Classes="pagetitle" Text="Settings" />
+                <TextBlock Classes="help" Text="How PATHology behaves." />
+            </StackPanel>
+
+            <!-- Changelog -->
+            <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="CHANGELOG" />
+                    <CheckBox IsChecked="{Binding ShowChangelogOnUpdate}"
+                              Content="Show what's new after an update"
+                              Foreground="{DynamicResource FgBrush}" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

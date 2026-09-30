@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Read-only by default: the build job compiles untrusted-ish inputs (NuGet packages, the toolchain) and never
+# needs to write. Only the final `release` job is granted contents: write, to create the GitHub Release.
+# Every action is pinned to a commit SHA (the version is in the trailing comment). There is no Dependabot,
+# so bump these by hand: resolve the new tag's commit and update the SHA and the comment together.
+permissions:
+  contents: read
+
+# The build job produces artifacts but does NOT touch the GitHub Release. The `release` job `needs` it, so a
+# failed build (or failed tests) publishes nothing rather than a half-populated release. PATHology is
+# Windows-only, so there is a single build job.
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The SDK comes from global.json, so CI builds with the same SDK as a local build.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      # vpk is pinned in .config/dotnet-tools.json (to the Velopack library version the app references).
+      - name: Restore vpk CLI
+        run: dotnet tool restore
+
+      - name: Test
+        run: dotnet test pathology.slnx -c Release --nologo
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=$($env:GITHUB_REF_NAME -replace '^v','')" >> $env:GITHUB_OUTPUT
+
+      # The changelog is embedded in the app and drives the post-update "What's new" window. A tag without a
+      # matching section ships an update that announces nothing, so refuse it here (run /bump-version first).
+      - name: Check CHANGELOG.md has this version
+        run: |
+          $heading = '## [v${{ steps.version.outputs.VERSION }}]'
+          if (-not (Select-String -LiteralPath CHANGELOG.md -SimpleMatch -Pattern $heading -Quiet)) {
+            Write-Host "::error::CHANGELOG.md has no '$heading' section - run /bump-version before tagging."
+            exit 1
+          }
+
+      - name: Publish
+        run: |
+          dotnet publish src/Pathology.App/Pathology.App.csproj -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=embedded `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/
+
+      - name: Pack with Velopack
+        run: dotnet vpk pack --packId Pathology --packTitle "PATHology" --packVersion ${{ steps.version.outputs.VERSION }} --packDir publish/ --mainExe pathology.exe --outputDir releases/
+
+      # Everything in releases/: Pathology-win-Setup.exe (what install.ps1 downloads and verifies), the
+      # Velopack update feed the in-app updater reads (nupkg + RELEASES + releases.win.json), and the portable zip.
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-release
+          path: releases/
+          if-no-files-found: error
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    # The one job that writes: it creates the GitHub Release. It checks nothing out and builds nothing.
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      # Flatten into the single flat namespace a GitHub Release actually has, then hash it. SHA256SUMS.txt is
+      # what install.ps1 verifies the installer against before running it, so it has to describe exactly the
+      # bytes that get uploaded - which is why it's generated here, from the artifacts about to be published,
+      # rather than in the build job.
+      - name: Collect artifacts and generate SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # A duplicate basename would make the manifest ambiguous and silently publish one of two different
+          # files under one name. Refuse rather than guess.
+          while IFS= read -r f; do
+            dest="dist/$(basename "$f")"
+            if [ -e "$dest" ]; then
+              echo "::error::Two build artifacts are both named $(basename "$f") - refusing to publish an ambiguous release."
+              exit 1
+            fi
+            mv "$f" "$dest"
+          done < <(find artifacts -type f | LC_ALL=C sort)
+
+          # install.ps1 resolves this asset by name from the release metadata; a release without it can't be
+          # installed by the one-liner, so fail here rather than shipping a broken install path.
+          if [ ! -f dist/Pathology-win-Setup.exe ]; then
+            echo "::error::Pathology-win-Setup.exe is missing - install.ps1 depends on it."
+            exit 1
+          fi
+
+          # Generated outside dist/ and moved in, so the manifest can never race its own glob.
+          ( cd dist && LC_ALL=C sha256sum -- * > ../SHA256SUMS.txt )
+          mv SHA256SUMS.txt dist/SHA256SUMS.txt
+
+          # The whole point of the manifest is that it describes the bytes being uploaded, so prove it with the
+          # same check a user would run, before anything is published.
+          ( cd dist && sha256sum -c SHA256SUMS.txt )
+
+          echo '### Published assets' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,15 @@
+<Project>
+  <!-- Shared by every project in the repo. Per-project csprojs set only what differs (TFM, output type). -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Company>PATHology</Company>
+    <Product>PATHology</Product>
+  </PropertyGroup>
+
+  <!-- Core is the pure detection/scoring engine: warnings there are bugs waiting to happen, so fail on them. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Pathology.Core'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
