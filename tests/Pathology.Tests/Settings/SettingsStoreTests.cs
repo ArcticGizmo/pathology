@@ -11,6 +11,7 @@ public class SettingsStoreTests
         var settings = new FileSettingsStore(store.Paths).Get();
 
         Assert.True(settings.ShowChangelogOnUpdate);
+        Assert.False(settings.ProbeNetworkPaths);   // opt-in only: probing a UNC path leaks an NTLM hash
         Assert.Null(settings.LastSeenVersion);
     }
 
@@ -20,10 +21,11 @@ public class SettingsStoreTests
         using var store = new TempStore();
         var sut = new FileSettingsStore(store.Paths);
 
-        sut.Save(new PathologySettings { ShowChangelogOnUpdate = false, LastSeenVersion = "0.4.1" });
+        sut.Save(new PathologySettings { ShowChangelogOnUpdate = false, ProbeNetworkPaths = true, LastSeenVersion = "0.4.1" });
 
         var loaded = sut.Get();
         Assert.False(loaded.ShowChangelogOnUpdate);
+        Assert.True(loaded.ProbeNetworkPaths);
         Assert.Equal("0.4.1", loaded.LastSeenVersion);
     }
 

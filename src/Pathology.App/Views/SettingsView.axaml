@@ -12,6 +12,18 @@
                 <TextBlock Classes="help" Text="How PATHology behaves." />
             </StackPanel>
 
+            <!-- Scanning -->
+            <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="SCANNING" />
+                    <CheckBox IsChecked="{Binding ProbeNetworkPaths}"
+                              Content="Probe network paths (UNC shares and mapped drives)"
+                              Foreground="{DynamicResource FgBrush}" />
+                    <TextBlock Classes="help" TextWrapping="Wrap"
+                               Text="Off by default. Opening \\host\share signs in to that host with your Windows credentials, and whoever runs it can capture a crackable hash of your password. While off, network entries are judged from their text alone." />
+                </StackPanel>
+            </Border>
+
             <!-- Changelog -->
             <Border Classes="panel">
                 <StackPanel Spacing="10">

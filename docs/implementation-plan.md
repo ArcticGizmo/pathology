@@ -153,54 +153,76 @@ working pipeline.
 Everything here is **read-only and side-effect free**: no test files, no directory creation, no
 `icacls`/`reg` shell-outs.
 
+> **Checkpoint 2026-09-30 (WIP commit on `v1`).** All code below is in and green (153 Core + 29 Windows
+> tests). Still to do before M1 is closed; pick up here:
+> 1. Run `pathology snapshot` once (prints counts only) and `pathology render ./captures/render` to eyeball
+>    the new Settings "SCANNING" panel.
+> 2. Check whether the two symlink tests actually ran or returned early ("skipped:" in the test output;
+>    they need Developer Mode). The junction tests always run.
+> 3. Add the M1 lines to `CHANGELOG.md` [Unreleased] (network-probe setting, `snapshot` verb).
+> 4. Review the diff once more, then make the final M1 commit.
+
 ### Model (`Pathology.Core/Model`)
-- [ ] `PathScope` (Machine, User), `RegistryValueKind` (`REG_SZ`, `REG_EXPAND_SZ`)
-- [ ] `RawPathValue`: scope, unexpanded string, value kind, length
-- [ ] `PathEntry`: scope, index, raw text, expanded text, normalised key, hygiene defects, `DirectoryFacts` ref
-- [ ] `DirectoryFacts`: exists, is-directory, attributes, reparse point + final target, drive type
-      (fixed/removable/network/UNC/mapped), owner SID, DACL as SDDL, nearest existing ancestor
-      (for missing dirs), `AccessResult` per perspective
-- [ ] `Perspective`: CurrentUserUnelevated, CurrentUserElevated, System, StandardUser
-- [ ] `AccessResult`: can add files, can add subdirectories, WRITE_DAC, WRITE_OWNER, and the ACE/owner that grants it
-- [ ] `PathSnapshot`: timestamp, OS build, both raw values, env vars by scope, the effective PATH, the current
-      process PATH, `PATHEXT`, entries, and a directory-facts map. It serialises to JSON.
-- [ ] **Snapshot redaction** (`SnapshotRedactor`): replace the username, user SID, machine name and profile
-      path with placeholders before any snapshot is written as a test fixture or exported. The org policy
-      forbids PII in fixtures and bug reports.
+- [x] `PathScope` (Machine, User), `PathValueKind` (`REG_SZ`, `REG_EXPAND_SZ`). *Named `PathValueKind`, not
+      `RegistryValueKind`, to avoid clashing with `Microsoft.Win32.RegistryValueKind` in `Pathology.Windows`.*
+- [x] `RawPathValue`: scope, unexpanded string, value kind, length
+- [x] `PathEntry`: scope, index, raw text, expanded text, form (absolute/relative/UNC/…), normalised key,
+      hygiene defects, referenced + unresolved variables, and `ProbePath` (the `DirectoryFacts` key)
+- [x] `DirectoryFacts`: exists, is-directory, attributes, reparse tag + target (+ whether it leads to the
+      network), drive type (fixed/removable/mapped network/UNC/not mounted) + mapped/subst target, owner SID,
+      SDDL (owner, group, DACL, label), long name, nearest existing ancestor, `AccessResult` per perspective
+- [x] `Perspective`: CurrentUserUnelevated, CurrentUserElevated, System, StandardUser, plus
+      `PerspectiveIdentity` (the SID set with attributes) kept in the snapshot
+- [x] `AccessResult`: the granted mask (can add files / subdirectories, WRITE_DAC, WRITE_OWNER), owner-implied
+      `WRITE_DAC`, and the granting ACEs (inherited or not)
+- [x] `PathSnapshot`: timestamp, host (OS build, UAC state, `EnableLinkedConnections`), both raw values, env
+      vars by source (machine, user, volatile, new process, current process), the effective PATH, the current
+      process PATH, `PATHEXT`, perspectives, entries, directories. Serialises to JSON (`PathSnapshotJson`,
+      camelCase, enums as names), and `Write` refuses an unredacted snapshot.
+      *Env var **names** are all kept; **values** only for what PATH references (transitively) plus a short
+      allowlist, because env vars hold tokens.*
+- [x] **Snapshot redaction** (`SnapshotRedactor`): rewrites every string. Account SIDs are renumbered
+      consistently (`S-1-5-21-0-0-n-RID`, Azure AD `S-1-12-1-0-0-0-n`); profile folders (8.3 forms and other
+      users' too), username, machine, domain, UNC hosts, `OneDrive - Org` and emails become placeholders.
+      Idempotent. `FindLeaks` reports leftovers by category only.
 
 ### Readers (`Pathology.Windows`, behind Core interfaces)
-- [ ] `IRegistryPathReader`: `RegistryKey.GetValue(..., DoNotExpandEnvironmentNames)` plus `GetValueKind`
-      for HKLM `...\Session Manager\Environment` and `HKCU\Environment`. Also reads every other variable
-      at both scopes, for the expansion checks.
-- [ ] `IEffectiveEnvironmentReader`: `CreateEnvironmentBlock(currentToken, bInherit: false)` gives the PATH
-      a **new** process would get. Keep the current process's PATH too, so a stale-Explorer divergence can be reported.
-- [ ] `IDirectoryProbe`:
-  - [ ] `SetThreadErrorMode(SEM_FAILCRITICALERRORS)` around probes, so a removable drive never pops "insert disk"
-  - [ ] Attributes via `GetFileAttributesEx`. Reparse targets via `CreateFile(FILE_READ_ATTRIBUTES,
-        FILE_FLAG_BACKUP_SEMANTICS)` then `GetFinalPathNameByHandle`, which opens a handle but writes nothing.
-  - [ ] Owner and DACL via `GetNamedSecurityInfo` (OWNER | DACL | LABEL) and SDDL
-  - [ ] Nearest existing ancestor for missing entries (walk up without creating anything)
-  - [ ] Drive type via `GetDriveType`. Mapped letters via `QueryDosDevice` / `WNetGetConnection`.
-  - [ ] **Never touch UNC or network paths by default.** Opening `\\attacker\share` sends SMB auth (an NTLM
-        hash leak), so they are classified from the string alone. Probing them is an opt-in Setting.
-  - [ ] Short-name expansion via `GetLongPathName`, for normalisation
-- [ ] `ITokenPerspectives`: builds the SID set for each perspective
-  - [ ] **CurrentUserUnelevated**: groups from the current (filtered) token, with Administrators deny-only honoured
-  - [ ] **CurrentUserElevated**: groups from `TokenLinkedToken`. Readable unelevated at identification level.
-        Equal to unelevated when UAC is off or the user isn't an admin.
-  - [ ] **System**: `S-1-5-18`, Administrators, Everyone, Authenticated Users
-  - [ ] **StandardUser**: a synthetic unknown user SID + Everyone, Users, Authenticated Users, INTERACTIVE, LOCAL
-- [ ] `IAccessEvaluator`: `AuthzInitializeContextFromSid` + `AuthzAddSidsToContext` +
-      `AuthzAccessCheck` against the captured security descriptor. This is authoritative (deny ordering,
-      inheritance, OWNER RIGHTS, CREATOR OWNER, integrity label) without ever writing. Owner-implied
-      `WRITE_DAC` is recorded separately so the "owned by non-admin" detector can explain it.
-- [ ] `SnapshotCapturer`: orchestrates the readers and reports progress into the operation checklist
+- [x] `IRegistryPathReader`: `DoNotExpandEnvironmentNames` + `GetValueKind`, read-only keys; every variable at
+      machine, user and volatile scope
+- [x] `IEffectiveEnvironmentReader`: `CreateEnvironmentBlock(token, bInherit: false)`, plus the current process's
+- [x] `IDirectoryProbe`:
+  - [x] `SetThreadErrorMode(SEM_FAILCRITICALERRORS)` around every probe
+  - [x] Attributes via `GetFileAttributesEx`. Reparse targets are read from the link's own reparse data
+        (`FSCTL_GET_REPARSE_POINT`), **not** `GetFinalPathNameByHandle`, which would follow the link and could
+        reach a UNC target. Relative symlinks resolve against their folder.
+  - [x] Owner, DACL and label via `GetSecurityInfo` on an `NtOpenFile(READ_CONTROL)` handle. *`CreateFileW`
+        adds `SYNCHRONIZE | FILE_READ_ATTRIBUTES` to every request, which an owner-only folder refuses even
+        though the owner implicitly holds `READ_CONTROL`. That's exactly the SEC-02 case.*
+  - [x] Nearest existing ancestor for missing entries (walked by `SnapshotCapturer` in Core, from strings)
+  - [x] Drive type via `GetDriveType`; mapped letters via `WNetGetConnection`; subst via `QueryDosDevice`
+  - [x] **Never touches UNC or network paths by default**: UNC, mapped drives, a subst onto a share, and any
+        path whose route passes through a link to one (each component is checked before anything is opened).
+        Opt-in via the new Settings toggle (`ProbeNetworkPaths`, off).
+  - [x] Short-name expansion via `GetLongPathName`, only for paths containing `~`
+- [x] `ITokenPerspectives`: current token + `TokenLinkedToken` (either direction, so running elevated works
+      too); SYSTEM and a synthetic standard user from fixed SID lists, each with an integrity label SID
+- [x] `IAccessEvaluator`: `AuthzInitializeContextFromSid(AUTHZ_SKIP_TOKEN_GROUPS)` + `AuthzAddSidsToContext` +
+      `AuthzAccessCheck(MAXIMUM_ALLOWED)`. *AuthZ does **not** apply the mandatory label to a SID-built
+      context (a test proved it), so no-write-up is applied on top from the SDDL's `ML` ACE.*
+- [x] `SnapshotCapturer` (in Core, over the interfaces): reports `CaptureProgress` per step for M4's checklist.
+      `WindowsCapture.Create` wires the real readers, and `AppServices.Capture` is the one caller.
+- [x] *Added:* `pathology snapshot [file]` writes a redacted snapshot (fixture material for M2, and the M4
+      bug-report export). It refuses to write if `FindLeaks` finds anything, and prints counts only.
 
 ### Tests
-- [ ] Windows integration tests: create temp dirs, **set crafted ACLs on those temp dirs only**, then assert the
-      `AccessEvaluator` results for each perspective (Users-writable, owner-only, deny-overrides, inherited from parent)
-- [ ] Junction and symlink test in the temp dir (a junction needs no admin)
-- [ ] A snapshot round-trips through JSON; the redactor removes every PII field
+- [x] Windows integration tests on temp dirs with crafted ACLs: Users-writable, owner-only, deny-overrides,
+      inherited from parent. SDDL-level evaluator tests add OWNER RIGHTS, inherit-only, deny-only
+      Administrators and the integrity label.
+- [x] Junction test (always runs); symlink-to-UNC and relative-symlink tests (need Developer Mode, otherwise
+      they return early and log "skipped")
+- [x] A snapshot round-trips through JSON; the redactor removes every PII field; a read-only capture of the real
+      machine redacts with no leaks. Windows test assertions use `Quiet.Same`, so a failure never prints
+      a real path or SID.
 
 ---
 
