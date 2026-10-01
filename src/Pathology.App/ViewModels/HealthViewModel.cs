@@ -178,7 +178,12 @@ public sealed partial class CategoryCardViewModel : ViewModelBase
     public IReadOnlyList<ProblemRowViewModel> Problems { get; }
 
     public bool HasMore => _health.Problems.Count > Problems.Count;
-    public string AllLabel => IsClean ? "" : $"All {_health.Problems.Count} {Name.ToLowerInvariant()} problems";
+    public string AllLabel => _health.Problems.Count switch
+    {
+        0 => "",
+        1 => $"See the {Name.ToLowerInvariant()} problem",
+        var n => $"All {n} {Name.ToLowerInvariant()} problems",
+    };
 
     [RelayCommand]
     private void Open() => _navigator.ToFindings(new FindingsQuery(Category: _health.Category));

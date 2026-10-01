@@ -426,3 +426,63 @@ public sealed class LengthHeadroom : IDetector
         }
     }
 }
+
+/// <summary>
+/// COR-09: System32 isn't on PATH at all, as a new process sees it: the machine PATH is missing, emptied, or its
+/// Windows entries never expand. Without it, Windows' own commands stop resolving by name.
+/// </summary>
+public sealed class WindowsFoldersMissing : IDetector
+{
+    public string Rule => "COR-09";
+
+    /// <summary>The stock machine PATH entries, as Windows ships them.</summary>
+    public const string StockEntries = @"%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\;%SYSTEMROOT%\System32\OpenSSH\";
+
+    public IEnumerable<Finding> Detect(DetectionContext context)
+    {
+        if (context.System32Position is not null) yield break;
+
+        var machine = context.Snapshot.MachinePath;
+        var machineEntries = context.Snapshot.EntriesIn(PathScope.Machine).Where(e => e.Form != PathForm.Empty).ToList();
+        // A REG_SZ value whose %SystemRoot% entries stayed literal is COR-02's problem seen from here: one fix.
+        var literal = machine.Kind == PathValueKind.String && machineEntries.Any(e => e.Variables.Any(v =>
+            v.Equals("SystemRoot", StringComparison.OrdinalIgnoreCase) || v.Equals("windir", StringComparison.OrdinalIgnoreCase)));
+        var none = machineEntries.Count == 0;
+        var system32 = (context.Variable("SystemRoot") ?? @"C:\Windows").TrimEnd('\\') + @"\System32";
+
+        yield return new Finding
+        {
+            Rule = Rule,
+            Category = FindingCategory.Correctness,
+            Severity = Severity.High,
+            Subject = "system32",
+            RootCause = literal ? "kind:" + PathScope.Machine : "no-system32",
+            Title = none ? "There's no machine PATH, so Windows' own folders aren't searched"
+                : literal ? "System32 is in the machine PATH as unexpanded text, so it isn't searched"
+                : "System32 isn't on PATH",
+            What = none
+                ? $"The machine PATH is {(machine.Kind == PathValueKind.Missing ? "missing from the registry" : "empty")}, so a new " +
+                  $"process searches only your user PATH, and {system32} and the Windows folder aren't in it."
+                : $"None of the {Words.Count(context.Entries.Count, "entry", "entries")} a new process searches is {system32}" +
+                  (literal ? ": the entry meant to be is stored as literal %SystemRoot% text." : "."),
+            Why = "Commands like where, ping, net and powershell stop resolving by name, and scripts, installers and build tools " +
+                  "that call them fail in ways that don't point at PATH. Programs that search PATH for system tools break too.",
+            Fix = (literal ? "Change the machine PATH's type back to REG_EXPAND_SZ (its text can stay as it is). " : "") +
+                  $"Make sure the machine PATH starts with Windows' own entries, {StockEntries}, stored as REG_EXPAND_SZ. " +
+                  "Then sign out and back in.",
+            Scope = PathScope.Machine,
+            Perspectives = [Perspective.CurrentUserUnelevated, Perspective.System],
+            Evidence =
+            [
+                "Machine PATH: " + machine.Kind switch
+                {
+                    PathValueKind.Missing => "not set",
+                    PathValueKind.String => "REG_SZ",
+                    PathValueKind.ExpandString => "REG_EXPAND_SZ",
+                    _ => "not a string value",
+                } + $", {Words.Count(machineEntries.Count, "entry", "entries")}",
+            ],
+            Learn = literal ? LearnTopics.ValueKinds : LearnTopics.NewProcessPath,
+        };
+    }
+}

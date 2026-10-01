@@ -42,7 +42,9 @@ helper — run **only from production code driven by a real user click**:
 
 Snapshot fixtures (`tests/Pathology.Tests/Fixtures/`) and exported snapshots carry real PATHs, which carry
 usernames, SIDs, machine names and profile paths. **Redact before writing** (`SnapshotRedactor`, M1) —
-replace them with placeholders like `C:\Users\<user>`. Never commit an unredacted capture. Posed renderer
+replace them with placeholders like `C:\Users\<user>`. Never commit an unredacted capture. The redactor also
+pseudonymises command file and variable names (they name people's projects), but folder names stay, so read a
+real-machine fixture before committing it and tell the user what it still reveals. Posed renderer
 states use made-up paths (`C:\Users\you\...`), never this machine's.
 
 ---

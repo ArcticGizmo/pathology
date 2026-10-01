@@ -54,6 +54,7 @@ public static class Diagnoser
         new DuplicateEntry(),                // COR-06
         new CompetingExecutables(),          // COR-07
         new LengthHeadroom(),                // COR-08
+        new WindowsFoldersMissing(),         // COR-09
         new StrayQuotes(),                   // HYG-01
         new StrayWhitespace(),               // HYG-02
         new OddSeparators(),                 // HYG-03

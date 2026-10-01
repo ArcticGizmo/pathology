@@ -76,6 +76,9 @@
             <Border Classes="panel" IsVisible="{Binding HasResult}">
                 <StackPanel Spacing="10">
                     <TextBlock Classes="phead" Text="WINDOWS COMMANDS" />
+                    <TextBlock Classes="field" IsVisible="{Binding NoBuiltins}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource HighBrush}"
+                               Text="No Windows command is on PATH at all: System32 isn't being searched, so commands like where, ping and net don't resolve by name. See Findings." />
                     <TextBlock Classes="field" IsVisible="{Binding BuiltinsSafe}"
                                Text="Every Windows command runs the Windows copy, and nothing ahead of System32 could be written to swap one out." />
 

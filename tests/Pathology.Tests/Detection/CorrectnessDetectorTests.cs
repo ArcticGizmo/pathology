@@ -176,6 +176,27 @@ public class CorrectnessDetectorTests
         Assert.Contains(@"python: C:\Python312\python.exe wins over C:\Python311\python.exe", finding.Evidence);
     }
 
+    [Fact]
+    public void COR07_commands_only_one_folder_provides_compete_with_nothing()
+    {
+        var machine = new TestMachine($@"{Windows};C:\Python312;C:\Node")
+            .Folder(@"C:\Python312", f => f.Files("python.exe"))
+            .Folder(@"C:\Node", f => f.Files("node.exe"));
+
+        Assert.Empty(machine.Findings("COR-07"));
+    }
+
+    [Fact]
+    public void COR07_two_extensions_of_a_name_in_one_folder_are_not_competing_folders()
+    {
+        // PATHEXT decides between them inside the folder; no other folder is hidden.
+        var machine = new TestMachine($@"{Windows};C:\Tools")
+            .Folder(@"C:\Tools", f => f.Files("build.exe", "build.cmd"));
+
+        Assert.Empty(machine.Findings("COR-07"));
+        Assert.Equal("build.exe", machine.Diagnose().Shadows.Resolve("build")!.Winner.FileName);
+    }
+
     // COR-08 ------------------------------------------------------------------------------------------------
 
     [Theory]
@@ -190,6 +211,36 @@ public class CorrectnessDetectorTests
         var findings = machine.Findings("COR-08").Where(f => f.Subject == "2,047").ToList();
 
         Assert.Equal(expected, findings.SingleOrDefault()?.Severity);
+    }
+
+    // COR-09 ------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void COR09_no_machine_PATH_at_all_is_high()
+    {
+        var finding = new TestMachine(null!, @"C:\Users\you\bin").Single("COR-09");
+
+        Assert.Equal(Severity.High, finding.Severity);
+        Assert.StartsWith("There's no machine PATH", finding.Title);
+        Assert.Equal("no-system32", finding.RootCause);
+    }
+
+    [Fact]
+    public void COR09_a_PATH_that_names_the_Windows_folders_is_quiet()
+    {
+        Assert.Empty(new TestMachine(Windows).Findings("COR-09"));
+        // Spelled with %windir% instead of %SystemRoot%, it's still System32.
+        Assert.Empty(new TestMachine(@"%windir%\System32").Findings("COR-09"));
+    }
+
+    [Fact]
+    public void COR09_a_REG_SZ_machine_PATH_is_one_problem_with_COR02()
+    {
+        var diagnosis = new TestMachine(Windows, machineKind: PathValueKind.String).Diagnose();
+
+        var group = Assert.Single(diagnosis.Groups, g => g.Members.Any(f => f.Rule == "COR-09"));
+        Assert.Equal("COR-02", group.Primary.Rule);
+        Assert.Contains("unexpanded text", group.Members.Single(f => f.Rule == "COR-09").Title);
     }
 
     [Fact]
@@ -239,6 +290,12 @@ public class HygieneAndConfigurationDetectorTests
     }
 
     [Fact]
+    public void HYG04_a_drive_root_is_not_a_trailing_backslash()
+    {
+        Assert.Empty(new TestMachine($@"{Windows};D:\").Findings("HYG-04"));
+    }
+
+    [Fact]
     public void A_clean_PATH_has_no_hygiene_findings()
     {
         Assert.DoesNotContain(new TestMachine(Windows, @"C:\Users\you\bin").Diagnose().Findings, f => f.Category == FindingCategory.Hygiene);
@@ -262,6 +319,30 @@ public class HygieneAndConfigurationDetectorTests
         var machine = new TestMachine(Windows, @"C:\Windows") { EffectivePath = @"C:\Windows\system32;C:\Windows" };
 
         Assert.Empty(machine.Findings("CFG-01"));
+    }
+
+    [Fact]
+    public void CFG01_one_variable_holding_several_entries_matches_its_expansion()
+    {
+        var machine = new TestMachine(@"%SystemRoot%\system32;%TOOLS%") { EffectivePath = @"C:\Windows\system32;C:\A;C:\B" };
+        machine.Environment.NewProcess["TOOLS"] = @"C:\A;C:\B";
+        machine.Registry.Machine["TOOLS"] = @"C:\A;C:\B";
+
+        Assert.Empty(machine.Findings("CFG-01"));
+    }
+
+    [Fact]
+    public void CFG02_a_process_started_with_the_current_PATH_is_quiet()
+    {
+        Assert.Empty(new TestMachine(Windows, @"C:\Users\you\bin").Findings("CFG-02"));
+    }
+
+    [Fact]
+    public void CFG02_the_same_entries_in_another_order_still_differ()
+    {
+        var machine = new TestMachine(Windows, @"C:\Users\you\bin") { ProcessPath = @"C:\Users\you\bin;C:\Windows\system32;C:\Windows" };
+
+        Assert.Contains("The same entries, in a different order", machine.Single("CFG-02").Evidence);
     }
 
     [Fact]

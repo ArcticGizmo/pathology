@@ -37,6 +37,7 @@ PATHology is a Windows PATH health and resolution tool. It diagnoses security an
 | Duplicates after normalisation (expansion, case, trailing slash, 8.3 short names) | Bloat, and ambiguity over which copy is authoritative | Merge |
 | Multiple directories providing the same executable (competing runtimes / toolchains) | Which version runs depends solely on order | **Shadowing report** — for each command name, which directory wins and which are hidden |
 | Value approaching length limits | Truncation corrupts PATH (the classic `setx` 1024-character accident) | Warning with remaining headroom |
+| System32 not on PATH (no machine PATH, or its Windows entries never expand) | Windows' own commands stop resolving by name, and scripts and installers that call them fail | Error |
 | Hygiene issues — stray quotes, trailing whitespace, doubled separators or backslashes | Causes subtle mismatches and false duplicates | Auto-clean |
 
 ## 3. Outcomes

@@ -206,6 +206,25 @@ public class SecurityDetectorTests
         Assert.Equal(@"C:\Shared\bin", finding.Subject);
     }
 
+    [Fact]
+    public void SEC06_a_user_folder_only_you_can_write_is_fine()
+    {
+        var machine = new TestMachine(Windows, @"C:\Users\you\bin").Folder(@"C:\Users\you\bin", f => f.WritableByYou());
+
+        Assert.Empty(machine.Findings("SEC-06"));
+    }
+
+    [Fact]
+    public void SEC06_a_missing_user_folder_other_users_could_create_is_medium_too()
+    {
+        var machine = new TestMachine(Windows, @"C:\Tools\bin").Folder(@"C:\", f => f.FoldersCreatableByEveryone());
+
+        var finding = machine.Single("SEC-06");
+
+        Assert.Equal(Severity.Medium, finding.Severity);
+        Assert.Contains(machine.Findings("COR-05"), f => f.RootCause == finding.RootCause);
+    }
+
     // SEC-07 ------------------------------------------------------------------------------------------------
 
     [Fact]

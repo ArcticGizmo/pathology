@@ -41,7 +41,10 @@ public sealed partial class ShadowingViewModel : ScanPageViewModel
     public bool HasQueryNote => QueryNote.Length > 0;
     public bool HasShadowedBuiltins => ShadowedBuiltins.Count > 0;
     public bool HasAtRisk => AtRisk.Count > 0;
-    public bool BuiltinsSafe => HasResult && !HasShadowedBuiltins && !HasAtRisk;
+    public bool BuiltinsSafe => HasResult && !NoBuiltins && !HasShadowedBuiltins && !HasAtRisk;
+
+    /// <summary>Nothing on PATH is a Windows command: System32 isn't searched (COR-09), so there's nothing to shadow.</summary>
+    public bool NoBuiltins => HasResult && !Result!.Diagnosis.Shadows.All.Any(r => r.Winner.IsWindows || r.Hidden.Any(h => h.IsWindows));
     public bool HasUnlistedNote => UnlistedNote.Length > 0;
 
     partial void OnQueryChanged(string value) => Lookup();
@@ -88,6 +91,7 @@ public sealed partial class ShadowingViewModel : ScanPageViewModel
         OnPropertyChanged(nameof(HasShadowedBuiltins));
         OnPropertyChanged(nameof(HasAtRisk));
         OnPropertyChanged(nameof(BuiltinsSafe));
+        OnPropertyChanged(nameof(NoBuiltins));
         OnPropertyChanged(nameof(HasUnlistedNote));
     }
 

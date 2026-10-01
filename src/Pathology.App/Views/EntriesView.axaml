@@ -59,7 +59,7 @@
                                             <TextBlock Classes="phead" Text="{Binding Heading}" VerticalAlignment="Center" />
                                             <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Center" />
                                         </StackPanel>
-                                        <ItemsControl Grid.Column="1" VerticalAlignment="Bottom"
+                                        <ItemsControl Grid.Column="1" VerticalAlignment="Bottom" IsVisible="{Binding HasRows}"
                                                       ItemsSource="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ColumnHeaders}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
@@ -125,6 +125,9 @@
 
             <Border Grid.Column="1" Classes="panel" Padding="0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Panel>
+                    <TextBlock Classes="help" Margin="22,20" IsVisible="{Binding !HasSelection}"
+                               Text="Neither PATH has any entries, so there's nothing here to look at." />
                     <StackPanel DataContext="{Binding Detail}" x:DataType="vm:EntryDetailViewModel"
                                 Margin="22,20" Spacing="16"
                                 IsVisible="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).HasSelection}">
@@ -193,6 +196,7 @@
                             </ItemsControl>
                         </StackPanel>
                     </StackPanel>
+                    </Panel>
                 </ScrollViewer>
             </Border>
         </Grid>

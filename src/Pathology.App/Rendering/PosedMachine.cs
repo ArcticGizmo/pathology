@@ -13,7 +13,7 @@ internal sealed class PosedMachine
 {
     public const string You = "S-1-5-21-111-222-333-1001";
 
-    readonly string _machinePath;
+    readonly string? _machinePath;
     readonly string? _userPath;
     readonly Dictionary<string, PosedFolder> _folders = new(StringComparer.OrdinalIgnoreCase);
 
@@ -33,7 +33,9 @@ internal sealed class PosedMachine
         ["ProgramData"] = @"C:\ProgramData",
     };
 
-    public PosedMachine(string machinePath, string? userPath)
+    /// <param name="machinePath">The machine PATH as stored, or null for none at all.</param>
+    /// <param name="userPath">The user PATH as stored, or null for none at all.</param>
+    public PosedMachine(string? machinePath, string? userPath)
     {
         _machinePath = machinePath;
         _userPath = userPath;
@@ -49,6 +51,9 @@ internal sealed class PosedMachine
     public bool Admin { get; init; } = true;
 
     public DateTimeOffset CapturedAt { get; init; } = new(2026, 10, 1, 9, 30, 0, TimeSpan.Zero);
+
+    /// <summary>How the machine PATH is stored. <c>REG_SZ</c> leaves its <c>%SystemRoot%</c> entries literal.</summary>
+    public PathValueKind MachineKind { get; init; } = PathValueKind.ExpandString;
 
     /// <summary>Declare a folder that exists. Anything not declared doesn't.</summary>
     public PosedMachine Folder(string path, Action<PosedFolder>? shape = null)
@@ -73,11 +78,14 @@ internal sealed class PosedMachine
     {
         public RegistryEnvironment Read()
         {
-            var machine = new Dictionary<string, string>(m.MachineVariables, StringComparer.OrdinalIgnoreCase) { ["Path"] = m._machinePath };
+            var machine = new Dictionary<string, string>(m.MachineVariables, StringComparer.OrdinalIgnoreCase);
+            if (m._machinePath is not null) machine["Path"] = m._machinePath;
             var user = new Dictionary<string, string>(m.UserVariables, StringComparer.OrdinalIgnoreCase);
             if (m._userPath is not null) user["Path"] = m._userPath;
             return new(
-                new RawPathValue { Scope = PathScope.Machine, Value = m._machinePath, Kind = PathValueKind.ExpandString },
+                m._machinePath is null
+                    ? RawPathValue.Missing(PathScope.Machine)
+                    : new RawPathValue { Scope = PathScope.Machine, Value = m._machinePath, Kind = m.MachineKind },
                 m._userPath is null
                     ? RawPathValue.Missing(PathScope.User)
                     : new RawPathValue { Scope = PathScope.User, Value = m._userPath, Kind = PathValueKind.ExpandString },
@@ -263,6 +271,28 @@ internal static class PosedMachines
         m.Folder(@"C:\Users\you\scoop\shims", f => f.WritableByYou().Files("rg.exe", "fd.exe", "7z.exe"));
         return m.Snapshot();
     }
+
+    /// <summary>
+    /// The worst case: a standard user's PC whose machine PATH was saved as REG_SZ (so every Windows folder in it
+    /// is dead), with a relative entry, a tools folder anyone can write, and a user PATH setx cut at 1,024.
+    /// </summary>
+    public static PathSnapshot Worst()
+    {
+        var setx = @"C:\Users\you\bin;" + string.Join(';', Enumerable.Range(1, 60).Select(i => $@"C:\Users\you\tools\t{i:00}"));
+        var m = new PosedMachine(@"C:\Tools;.;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem", setx[..1024])
+        {
+            Admin = false,
+            MachineKind = PathValueKind.String,
+        };
+        m.Folder(@"C:\", f => f.FoldersCreatableByEveryone());
+        m.Folder(@"C:\Tools", f => f.WritableByEveryone().Files("where.bat", "net.cmd", "jq.exe"));
+        m.Folder(@"C:\Users\you", f => f.WritableByYou());
+        m.Folder(@"C:\Users\you\bin", f => f.WritableByYou().Files("jq.exe"));
+        return m.Snapshot();
+    }
+
+    /// <summary>No PATH at all, at either scope: what the pages say when there's nothing to judge.</summary>
+    public static PathSnapshot Empty() => new PosedMachine(null, null).Snapshot();
 
     /// <summary>A fresh Windows install: the stock machine PATH and the WindowsApps folder every user gets.</summary>
     public static PathSnapshot Clean()

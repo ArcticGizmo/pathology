@@ -21,6 +21,8 @@ namespace Pathology.Core.Redaction;
 /// (8.3 short forms and other people's profiles included), and the username as a whole word.</item>
 /// <item>The machine name and user domain become <c>&lt;machine&gt;</c> and <c>&lt;domain&gt;</c>; UNC hosts
 /// become <c>&lt;host&gt;</c>; <c>OneDrive - Org</c> becomes <c>OneDrive - &lt;org&gt;</c>; email addresses go.</item>
+/// <item>Command file names outside the Windows folder, and environment variable names PATH doesn't depend on,
+/// are pseudonymised consistently (<see cref="NamePseudonymiser"/>): they name people's projects and employers.</item>
 /// </list>
 /// The placeholders contain <c>&lt;</c> and <c>&gt;</c>, which no real path can, so a redacted value is never
 /// mistaken for a live one. Redacting twice changes nothing.
@@ -71,7 +73,7 @@ public static class SnapshotRedactor
         var node = JsonSerializer.SerializeToNode(snapshot, WorkingOptions)!;
         scrubber.Walk(node);
 
-        var redacted = node.Deserialize<PathSnapshot>(WorkingOptions)!;
+        var redacted = NamePseudonymiser.Apply(node.Deserialize<PathSnapshot>(WorkingOptions)!);
         return redacted with
         {
             Redacted = true,

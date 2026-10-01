@@ -42,6 +42,27 @@ public class HealthViewModelTests
     }
 
     [Fact]
+    public void An_empty_PATH_is_not_clean()
+    {
+        var vm = new HealthViewModel(Sessions.Showing(PosedMachines.Empty()), new RecordingNavigator());
+
+        var correctness = vm.Cards.Single(c => c.Name == "Correctness");
+        Assert.Equal("HIGH", correctness.RatingWord);
+        Assert.Equal("See the correctness problem", correctness.AllLabel);
+        Assert.False(vm.IsClean);
+    }
+
+    [Fact]
+    public void The_worst_case_is_high_in_security_and_correctness()
+    {
+        var vm = new HealthViewModel(Sessions.Showing(PosedMachines.Worst()), new RecordingNavigator());
+
+        Assert.Equal("HIGH", vm.Cards.Single(c => c.Name == "Security").RatingWord);
+        Assert.Equal("HIGH", vm.Cards.Single(c => c.Name == "Correctness").RatingWord);
+        Assert.Equal("Not applicable", vm.UacHeadline);
+    }
+
+    [Fact]
     public void Uac_exposure_does_not_apply_to_a_standard_user()
     {
         var machine = new TestMachine(@"%SystemRoot%\system32", @"C:\Users\you\bin") { Admin = false }

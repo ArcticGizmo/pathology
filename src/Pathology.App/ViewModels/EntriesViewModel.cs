@@ -103,6 +103,7 @@ public sealed class EntrySectionViewModel
     public string Heading { get; }
     public string Summary { get; }
     public IReadOnlyList<EntryRowViewModel> Rows { get; }
+    public bool HasRows => Rows.Count > 0;
 }
 
 /// <summary>

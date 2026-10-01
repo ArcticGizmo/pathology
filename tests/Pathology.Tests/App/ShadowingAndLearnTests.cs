@@ -46,6 +46,18 @@ public class ShadowingViewModelTests
         Assert.False(vm.BuiltinsSafe);
     }
 
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("worst")]
+    public void With_System32_off_PATH_nothing_claims_the_built_ins_are_safe(string pose)
+    {
+        var snapshot = pose == "empty" ? PosedMachines.Empty() : PosedMachines.Worst();
+        var vm = new ShadowingViewModel(Sessions.Showing(snapshot), new RecordingNavigator());
+
+        Assert.True(vm.NoBuiltins);
+        Assert.False(vm.BuiltinsSafe);
+    }
+
     [Fact]
     public void A_stock_install_has_its_built_ins_safe()
     {

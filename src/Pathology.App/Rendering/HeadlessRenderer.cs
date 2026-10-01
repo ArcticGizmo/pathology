@@ -82,7 +82,10 @@ internal static class HeadlessRenderer
     static MainWindowViewModel Shell(AppServices services, ScanResult? result) =>
         new(services, PosedSession(result), checkForUpdates: false);
 
-    /// <summary>Health when everything is clean, part-way through a scan, and before any scan.</summary>
+    /// <summary>
+    /// Health when everything is clean, part-way through a scan, and before any scan; then the worst case and an
+    /// empty PATH on every diagnostic page.
+    /// </summary>
     static void RenderHealthStates(string outDir, AppServices services)
     {
         Capture(Shell(services, ScanResult.Of(PosedMachines.Clean())), Path.Combine(outDir, "health_clean.png"));
@@ -94,6 +97,17 @@ internal static class HeadlessRenderer
         Capture(scanning, Path.Combine(outDir, "health_scanning.png"));
 
         Capture(Shell(services, null), Path.Combine(outDir, "health_idle.png"));
+
+        // The worst case and the empty one, across the pages where they look different.
+        foreach (var (name, snapshot) in new[] { ("worst", PosedMachines.Worst()), ("empty", PosedMachines.Empty()) })
+        {
+            var vm = Shell(services, ScanResult.Of(snapshot));
+            foreach (var page in new PageViewModel[] { vm.Health, vm.Findings, vm.Entries, vm.Shadowing })
+            {
+                vm.CurrentPage = page;
+                Capture(vm, Path.Combine(outDir, $"{page.Title.ToLowerInvariant()}_{name}.png"));
+            }
+        }
     }
 
     /// <summary>Other selections worth eyeballing: notes, a hygiene entry, a shadowed built-in, a long article.</summary>

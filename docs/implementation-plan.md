@@ -289,6 +289,9 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 - [x] `COR-08` Length headroom → **Medium** at ≥ 80% of the limit, **High** at ≥ 95%. Checks the 2047-char
       effective-PATH threshold that older tools choke on, the 32,767 env-block limit, and flags the `setx`
       1024 truncation signature (a value exactly 1024 chars long).
+- [x] *Added in M5:* `COR-09` System32 isn't on PATH (no machine PATH, an emptied one, or Windows entries that
+      never expand) → **High**. *The golden-state review caught an empty PATH rating Clean. A `REG_SZ` machine
+      PATH shares COR-02's root cause, so it's one problem.*
 
 ### Hygiene
 - [x] `HYG-01` Stray quotes → **Low**
@@ -443,17 +446,26 @@ the page, each pane scrolling on its own.*
 ### Headless verbs (read-only, as in emuwren)
 - [x] `pathology scan`: prints findings and the category ratings as plain text; exit code = count of High
       problems. This is a dev and verification aid with no stable output contract. *Landed in M2 and M3.*
-- [ ] `pathology render <dir>`: every page (plus posed states such as clean, all-High and empty) to PNG via
-      Avalonia.Headless, into `./captures/render`. *M4 added `PosedMachine` (a made-up PC through the real
-      capturer) and poses a messy PC on every page, plus Health clean, scanning and not-yet-scanned, and a few
-      selections. Still to add: all-High and an empty PATH.*
-- [ ] `pathology check-update`
+- [x] `pathology render <dir>`: every page (plus posed states such as clean, all-High and empty) to PNG via
+      Avalonia.Headless, into `./captures/render`. *Every page over a posed messy PC; Health clean, scanning and
+      not-yet-scanned; Health, Findings, Entries and Shadowing for the worst case and an empty PATH; and
+      selected findings, entries, commands and articles. "All-High" is Security and Correctness High: no
+      Hygiene rule goes above Low. The worst case is a standard user with a `REG_SZ` machine PATH, a relative
+      entry, a world-writable tools folder and a setx-truncated user PATH.*
+- [x] `pathology check-update` *(from M0)*
 
 ### Quality gates
-- [ ] Every detector has fixture tests. Fixtures are **redacted** snapshots captured from real machines,
-      re-captured rather than hand-edited.
+- [x] Every detector has fixture tests. Fixtures are **redacted** snapshots captured from real machines,
+      re-captured rather than hand-edited. *Each rule has `TestMachine` cases (positive, negative, edge; M5
+      filled in COR-07, CFG-01/02, HYG-04 and SEC-06), and `RealMachineFixtureTests` runs the whole engine over
+      `Fixtures/dev-machine.redacted.json`, the M2/M3 verification PC, pinning its hand-checked ratings. Before
+      committing it, review found the redactor kept **command file names** and **variable names** (a scripts
+      folder named employer projects), so `NamePseudonymiser` now replaces both with consistent placeholders
+      (`<cmd-n>.bat`, `<var-n>`), keeping Windows' own names, PATH's variables and well-known ones readable. The
+      diagnosis is identical either side of it; the bug-report export gets it too.*
 - [x] Rating-model tests (M3)
-- [ ] Render the golden states and review them by eye
+- [x] Render the golden states and review them by eye. *Found and fixed: an empty PATH rated Clean (COR-09),
+      Shadowing calling built-ins safe with System32 off PATH, "All 1 … problems", and the empty Entries pane.*
 - [ ] Manual test matrix: admin user with UAC on, standard user, and a machine with a deliberately
       writable `C:\Tools` in machine PATH (set up by hand in a VM)
 - [ ] `CHANGELOG.md` 1.0.0 → tag `v1.0.0`

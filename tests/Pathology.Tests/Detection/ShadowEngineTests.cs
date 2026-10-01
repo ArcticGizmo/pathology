@@ -93,7 +93,7 @@ public class DiagnoserTests
         var rules = Diagnoser.All.Select(d => d.Rule).ToList();
 
         Assert.Equal(rules.Distinct().Count(), rules.Count);
-        Assert.Equal(23, rules.Count);
+        Assert.Equal(24, rules.Count);
         Assert.All(rules, r => Assert.Matches(@"^(SEC|COR|HYG|CFG)-\d\d$", r));
     }
 
