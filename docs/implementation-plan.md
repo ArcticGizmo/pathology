@@ -467,7 +467,10 @@ the page, each pane scrolling on its own.*
 - [x] Render the golden states and review them by eye. *Found and fixed: an empty PATH rated Clean (COR-09),
       Shadowing calling built-ins safe with System32 off PATH, "All 1 … problems", and the empty Entries pane.*
 - [ ] Manual test matrix: admin user with UAC on, standard user, and a machine with a deliberately
-      writable `C:\Tools` in machine PATH (set up by hand in a VM)
+      writable `C:\Tools` in machine PATH (set up by hand in a VM). *Checklist with expected values:
+      [manual-testing.md](manual-testing.md). It runs on the dev PC itself (a scan writes nothing), whose
+      `C:\scripts` and `C:\programs\…` folders already are the writable-before-System32 case, so no PATH edit is
+      needed. The standard-user pass uses a temporary local account.*
 - [ ] `CHANGELOG.md` 1.0.0 → tag `v1.0.0`
 
 ---
