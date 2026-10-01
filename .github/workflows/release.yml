@@ -60,7 +60,7 @@ jobs:
             -o publish/
 
       - name: Pack with Velopack
-        run: dotnet vpk pack --packId Pathology --packTitle "PATHology" --packVersion ${{ steps.version.outputs.VERSION }} --packDir publish/ --mainExe pathology.exe --outputDir releases/
+        run: dotnet vpk pack --packId Pathology --packTitle "PATHology" --packVersion ${{ steps.version.outputs.VERSION }} --packDir publish/ --mainExe pathology.exe --icon src/Pathology.App/Assets/pathology.ico --outputDir releases/
 
       # Everything in releases/: Pathology-win-Setup.exe (what install.ps1 downloads and verifies), the
       # Velopack update feed the in-app updater reads (nupkg + RELEASES + releases.win.json), and the portable zip.

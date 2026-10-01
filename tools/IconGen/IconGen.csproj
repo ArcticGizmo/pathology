@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Rasterises the logo's single source of truth (pathology.svg, repo root) into the icon assets the app and
+    README need. Run with `dotnet run` here, or tools/gen-icons.ps1.
+
+    Kept out of pathology.slnx on purpose: only the generated assets are committed, so nothing that ships
+    depends on an SVG renderer.
+
+    Renders with Svg.Skia (SkiaSharp), as ../binoc does. Skia's anti-aliasing is much crisper than
+    GDI+/System.Drawing at icon sizes, where the logo's thin highlight edges otherwise turn muddy.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Pathology.IconGen</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Svg.Skia" Version="2.0.0.4" />
+  </ItemGroup>
+</Project>

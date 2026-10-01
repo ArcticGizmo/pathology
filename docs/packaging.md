@@ -26,7 +26,7 @@ dotnet publish src/Pathology.App/Pathology.App.csproj -c Release -r win-x64 --se
   -p:Version=0.1.0 -o publish/
 
 dotnet vpk pack --packId Pathology --packTitle "PATHology" --packVersion 0.1.0 \
-  --packDir publish/ --mainExe pathology.exe --outputDir releases/
+  --packDir publish/ --mainExe pathology.exe --icon src/Pathology.App/Assets/pathology.ico --outputDir releases/
 ```
 
 `releases/` then holds `Pathology-win-Setup.exe`, `Pathology-<version>-full.nupkg`,
@@ -123,4 +123,9 @@ store; any other value forces dev. See `Pathology.Core/Store/AppProfile.cs`.
 ## Not yet done
 
 - **Code signing** — `vpk pack` warns that files are unsigned. Add `--signParams` once a certificate exists.
-- **An app icon** — `--icon` (and the window/`ApplicationIcon`) are deliberately absent until one exists.
+
+## Icon
+
+`src/Pathology.App/Assets/pathology.ico` is the `.exe`'s `ApplicationIcon`, every window's icon, and the
+installer's `--icon`. It and the README's `landing-icon.png` are generated from `pathology.svg` by
+`tools/gen-icons.ps1`. See the README's *Icons* section.

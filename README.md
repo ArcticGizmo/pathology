@@ -1,6 +1,16 @@
-# PATHology
+<h1 align="center">PATHology</h1>
 
-**Windows PATH health.** PATHology diagnoses security and correctness problems in the machine and user
+<p align="center">
+ <img src="./landing-icon.png" width="150" />
+</p>
+
+<p align="center">
+<strong>Windows PATH health</strong>
+</p>
+
+<br>
+
+PATHology diagnoses security and correctness problems in the machine and user
 `PATH`, explains why each one matters, and (from a later release) produces safe, reversible fixes.
 
 > **Status: early.** v0.1 is the app shell and release pipeline. Scanning, findings and health ratings work
@@ -31,3 +41,18 @@ dotnet run --project src/Pathology.App
 ```
 
 Release and packaging details are in [docs/packaging.md](docs/packaging.md).
+
+## Icons
+
+The logo's single source of truth is [`pathology.svg`](pathology.svg). The raster assets (the window, `.exe`
+and installer icon, and the header image above) are generated from it, so nothing that ships depends on an
+SVG renderer:
+
+```powershell
+tools/gen-icons.ps1     # or: dotnet run --project tools/IconGen -c Release
+```
+
+Run that after editing `pathology.svg`, then commit the regenerated `src/Pathology.App/Assets/pathology.ico`
+and `landing-icon.png`. It renders with Svg.Skia, which stays crisp at 16–48px where GDI+ goes muddy. Add
+`-- --preview captures/icon-frames.png` to the `dotnet run` form for an enlarged sheet of the small frames.
+`tools/IconGen` is deliberately kept out of `pathology.slnx`.

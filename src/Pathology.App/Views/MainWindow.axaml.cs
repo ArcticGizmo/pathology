@@ -4,5 +4,9 @@ namespace Pathology.App.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        Icon = AppIcon.Load();
+    }
 }

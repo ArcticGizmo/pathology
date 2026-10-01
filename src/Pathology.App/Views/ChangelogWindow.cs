@@ -21,6 +21,7 @@ public sealed class ChangelogWindow : Window
         Action? onSuppress = null)
     {
         Title = "PATHology — What's new";
+        Icon = AppIcon.Load();
         Width = 540;
         Height = 620;
         CanResize = true;

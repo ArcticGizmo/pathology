@@ -11,9 +11,12 @@
     <Version>0.1.0</Version>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The .exe icon (Explorer, taskbar pin). Regenerate from pathology.svg with tools/gen-icons.ps1. -->
+    <ApplicationIcon>Assets\pathology.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Includes pathology.ico, loaded at runtime as the window icon (Views/AppIcon.cs). -->
     <AvaloniaResource Include="Assets/**" />
   </ItemGroup>
 

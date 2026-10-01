@@ -86,7 +86,7 @@ working pipeline.
 
 ### App shell (ported from emuwren)
 - [x] `Pathology.App.csproj`: `WinExe`, `AssemblyName=pathology`, `Product=PATHology`,
-      `AvaloniaUseCompiledBindingsByDefault`, app manifest, embedded `CHANGELOG.md` *(no icon yet; see below)*
+      `AvaloniaUseCompiledBindingsByDefault`, app manifest, embedded `CHANGELOG.md` *(the icon came later; see below)*
 - [x] `app.manifest`: `asInvoker`, PerMonitorV2 DPI, `longPathAware`, Windows 10+ supportedOS
 - [x] `Program.Main`: `VelopackApp.Build().Run()` **first**, then the headless verbs, then Avalonia
 - [x] `ViewLocator`, `ViewModelBase`, `PageViewModel`, `NavHeaderViewModel`, `MainWindowViewModel`.
@@ -131,7 +131,7 @@ working pipeline.
   - [x] `build` job (windows-latest): checkout (`persist-credentials: false`) → setup-dotnet from
         `global.json` → `dotnet tool restore` → **`dotnet test`** → version from tag → **CHANGELOG has a
         section for the tag** → `dotnet publish` win-x64 self-contained single-file → `dotnet vpk pack` →
-        upload `releases/`. *No `--icon` yet.*
+        upload `releases/`. *`--icon` was added with the app icon.*
   - [x] `release` job (`needs: build`, `contents: write`): download → refuse duplicate names → fail if
         `Pathology-win-Setup.exe` is missing → generate `SHA256SUMS.txt` outside `dist/` and move it in →
         `sha256sum -c` → step summary → `softprops/action-gh-release` with `generate_release_notes`
@@ -142,8 +142,11 @@ working pipeline.
       emuwren's `Invoke-Expression` loader.*
 - [x] `tools/test-install.ps1`: ASCII purity, BOM, the entry-point guard, and manifest parsing (8 checks, passing on 5.1)
 - [x] `docs/packaging.md`
-- [ ] App icon: generate a prompt with the `icon-prompt` skill → `tools/gen-icons.ps1` → `Assets/pathology.ico`,
-      then add `ApplicationIcon`, the window `Icon` and `vpk pack --icon`
+- [x] App icon: `pathology.svg` (hand-drawn) → `tools/gen-icons.ps1` → `Assets/pathology.ico`,
+      then add `ApplicationIcon`, the window `Icon` and `vpk pack --icon`. *Ported binoc's `tools/IconGen`:
+      Svg.Skia instead of GDI+ (which went muddy at small sizes), a crop to the drawn content, and a PNG frame
+      at every size from 16 to 256. It also writes the README's `landing-icon.png` (512px), and `--preview` writes
+      an enlarged sheet of the small frames.*
 - [ ] **Exit criterion:** create the GitHub repo and push, run `/bump-version`, tag `v0.1.0`, confirm the
       one-liner installs it, then tag `v0.1.1` and confirm the in-app update applies
 
