@@ -356,58 +356,85 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 ## Milestone 4 — UI
 
 Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollViewer` holding a
-`StackPanel MaxWidth≈860` with a title, help text and a Re-scan button at the top right.
+`StackPanel MaxWidth≈860` with a title, help text and a Re-scan button at the top right. *Health and Shadowing
+are that shape at 980 wide (three cards need the room). Findings, Entries and Learn are master/detail and fill
+the page, each pane scrolling on its own.*
+
+> **Done 2026-10-01.** 287 Core/App + 33 Windows tests (37 new, over the renderer's posed machines and
+> `TestMachine`). Every page reviewed by eye through `pathology render` on a posed messy PC and a stock one.
 
 ### Nav
-- [ ] Brand `pathology` + tagline "windows PATH health"
-- [ ] Section **Diagnose**: Health, Findings (count badge = High problems), Entries (entry count), Shadowing
-- [ ] Section **Understand**: Learn
-- [ ] Bottom: update button (when available) → Settings → About (version)
-- [ ] The scan runs on launch and on Re-scan, sharing one snapshot across every page; progress goes into the
-      `OperationProgressViewModel` checklist (ported)
+- [x] Brand `pathology` + tagline "windows PATH health" *(from M0)*
+- [x] Section **Diagnose**: Health, Findings (count badge = High problems), Entries (entry count), Shadowing
+- [x] Section **Understand**: Learn
+- [x] Bottom: update button (when available) → Settings → About (version) *(from M0)*
+- [x] The scan runs on launch and on Re-scan, sharing one snapshot across every page. *`ScanSession` holds
+      the one `ScanResult` (snapshot, diagnosis, ratings) every page rebuilds from. Progress is a checklist
+      on the page itself (`ScanStatusPanel`, one row per `CaptureStep`) rather than emuwren's progress window:
+      a scan takes seconds and blocks nothing. The capture is injected, so the renderer and tests can only
+      pose a result, never scan this machine.*
+- [x] *Added:* an `INavigator` (the shell) for cross-page jumps: Health → a finding or a category, a finding
+      → its entry or its Learn article, Health/Shadowing → a command. The target list scrolls to the selection.
 
 ### Health (landing page)
-- [ ] **Three category cards** (Security, Correctness, Hygiene), side by side: the rating as a coloured word
+- [x] **Three category cards** (Security, Correctness, Hygiene), side by side: the rating as a coloured word
       (CLEAN / LOW / MEDIUM / HIGH), the counts beneath ("9 high · 2 medium"), and "Fix 9 to bring it to Medium"
-- [ ] Each card's worst problems (up to 3) as rows (severity glyph, one-line title, scope pill). Clicking one
-      opens Findings filtered to it; clicking the card opens Findings filtered to the category.
-- [ ] A notes line under the cards ("12 notes: competing tools and the like"), linking to Findings' Info filter
-- [ ] Panels: **UAC exposure** (`SEC-07`), **Length headroom** (a bar for each limit), **Scan info** (time,
-      perspectives evaluated, entry counts, whether UNC probing was skipped)
-- [ ] Clean state: all three cards green with "Nothing to fix"
+- [x] Each card's worst problems (up to 3) as rows (severity glyph, one-line title, scope pill). Clicking one
+      opens Findings filtered to it; clicking the card opens Findings filtered to the category. *The card
+      itself isn't a button (its rows are); an "All N security problems" link at its foot opens the category.*
+- [x] A notes line under the cards ("12 notes: competing tools and the like"), linking to Findings' Info filter
+- [x] Panels: **UAC exposure** (`SEC-07`), **Length headroom** (a bar for each limit), **Scan info** (time,
+      perspectives evaluated, entry counts, whether UNC probing was skipped). *UAC says "not applicable" for a
+      standard user or no split token, and "only the Windows baseline" for the stock WindowsApps. Headroom
+      reads `LengthHeadroom.EffectivePath`, so it can't disagree with COR-08.*
+- [x] Clean state: all three cards green with "Nothing to fix"
 
 ### Findings
-- [ ] Severity-ranked list with filters: severity, category, scope, perspective
-- [ ] Master/detail (emuwren's list pane capped at `ListPaneMaxWidth`): the detail shows **What / Why / Fix**,
+- [x] Severity-ranked list with filters: severity, category, scope, perspective. *Severity defaults to
+      "Problems" (notes are one filter away), so the list matches the ratings.*
+- [x] Master/detail (emuwren's list pane capped at `ListPaneMaxWidth`): the detail shows **What / Why / Fix**,
       affected entries, the perspectives it applies to, the granting ACE or owner, and a "Learn more" link into Learn
-- [ ] Root-cause groups expand to show their child entries
-- [ ] "Copy details" (plain text, for a ticket)
+- [x] Root-cause groups expand to show their child entries. *One row per group in the list; the detail lists
+      the group's entries and its other findings ("same cause, also found by"), each of which can be opened.*
+- [x] "Copy details" (plain text, for a ticket)
 
 ### Entries
-- [ ] Machine and user PATH, each in resolved order (index, raw → expanded, value kind shown once per scope)
-- [ ] Per entry: status glyphs, a **perspective matrix** (4 columns: writable / not / n/a), owner, reparse
-      target, drive type, and the findings attached to it
-- [ ] Toggle between raw and expanded, and to show hygiene defects inline (highlighted characters)
-- [ ] Uses `CharWrapTextBlock` (ported) for long paths
+- [x] Machine and user PATH, each in resolved order (index, raw → expanded, value kind shown once per scope).
+      *The empty slot Windows' own trailing `;` leaves isn't listed.*
+- [x] Per entry: status glyphs, a **perspective matrix** (4 columns: writable / not / n/a), owner, reparse
+      target, drive type, and the findings attached to it. *Writable is "can plant files" judged at the end of
+      any link chain. Colour says how much it matters: a standard user red, you orange, you elevated and
+      SYSTEM grey (expected for an administrator). The detail pane has every captured fact and, per
+      perspective, the rights and the ACEs granting them.*
+- [x] Toggle between raw and expanded, and to show hygiene defects inline (highlighted characters).
+      *`DefectSegmenter` picks out quotes, edge whitespace (shown as `·`), doubled backslashes other than a UNC
+      prefix, and forward slashes.*
+- [x] Uses `CharWrapTextBlock` (ported) for long paths. *With a `Prose` mode that breaks only after `\`, for
+      finding text that mentions paths.*
 
 ### Shadowing
-- [ ] Search box ("which python?"): resolution chain, winner, hidden copies
-- [ ] List of commands with more than one provider, sortable by "winner is writable" first
-- [ ] Highlight built-ins (`where`, `cmd`, `powershell`, `net`, …) that are shadowable by a writable earlier entry
+- [x] Search box ("which python?"): resolution chain, winner, hidden copies, and who could replace each
+- [x] List of commands with more than one provider, sortable by "winner is writable" first ("Riskiest first")
+- [x] Highlight built-ins (`where`, `cmd`, `powershell`, `net`, …) that are shadowable by a writable earlier
+      entry. *Two lists: built-ins already beaten by something earlier on PATH, and the SEC-04 folders ahead of
+      System32 that someone could write.*
 
 ### Learn
-- [ ] Embedded markdown articles: DLL search order, PATHEXT precedence, UAC and PATH inheritance, how
-      Windows builds a new process's PATH, REG_SZ vs REG_EXPAND_SZ, phantom directories, why not `setx`
-- [ ] Rendered with Markdig (as perch does), deep-linkable from findings
+- [x] Embedded markdown articles: DLL search order, PATHEXT precedence, UAC and PATH inheritance, how
+      Windows builds a new process's PATH, REG_SZ vs REG_EXPAND_SZ, phantom directories, why not `setx`.
+      *In `Pathology.Core/Learn` (`LearnLibrary`), keyed by the `LearnTopics` ids; a test proves every id has one.*
+- [x] Rendered with Markdig (as perch does), deep-linkable from findings. *`Controls/MarkdownBlock` is a trimmed
+      port of perch's `MarkdownView`. Links render but aren't followed: the articles are self-contained.*
 
 ### Settings
-- [ ] Scan on launch (on by default)
-- [ ] Probe UNC/network paths (**off** by default, with a warning explaining the auth leak)
-- [ ] Show the What's-new window after updates
-- [ ] Export a redacted snapshot (for bug reports)
+- [x] Scan on launch (on by default)
+- [x] Probe UNC/network paths (**off** by default, with a warning explaining the auth leak)
+- [x] Show the What's-new window after updates
+- [x] Export a redacted snapshot (for bug reports). *Shares `SnapshotExport` with `pathology snapshot`: redact,
+      leak-check, refuse rather than write anything identifying.*
 
 ### About
-- [ ] Version, update check / download & install, changelog viewer, repo link
+- [x] Version, update check / download & install, changelog viewer, repo link *(from M0)*
 
 ---
 
@@ -417,7 +444,9 @@ Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollVie
 - [x] `pathology scan`: prints findings and the category ratings as plain text; exit code = count of High
       problems. This is a dev and verification aid with no stable output contract. *Landed in M2 and M3.*
 - [ ] `pathology render <dir>`: every page (plus posed states such as clean, all-High and empty) to PNG via
-      Avalonia.Headless, into `./captures/render`
+      Avalonia.Headless, into `./captures/render`. *M4 added `PosedMachine` (a made-up PC through the real
+      capturer) and poses a messy PC on every page, plus Health clean, scanning and not-yet-scanned, and a few
+      selections. Still to add: all-High and an empty PATH.*
 - [ ] `pathology check-update`
 
 ### Quality gates

@@ -41,6 +41,10 @@ internal static class HeadlessRenderer
                 var messy = ScanResult.Of(PosedMachines.Messy());
 
                 var vm = Shell(services, messy);
+                // Pose each page with something worth looking at selected, the way a user would leave it.
+                vm.Shadowing.Show("python");
+                vm.Entries.Select(Core.Model.PathScope.Machine, 0);
+                vm.Learn.Open(Core.Detection.LearnTopics.ValueKinds);
                 foreach (var page in vm.Pages)
                 {
                     vm.CurrentPage = page;
@@ -48,6 +52,7 @@ internal static class HeadlessRenderer
                 }
 
                 RenderHealthStates(outDir, services);
+                RenderSelections(outDir, services, messy);
                 RenderChangelog(outDir);
                 RenderUpdateButton(outDir, services, messy);
             }
@@ -89,6 +94,28 @@ internal static class HeadlessRenderer
         Capture(scanning, Path.Combine(outDir, "health_scanning.png"));
 
         Capture(Shell(services, null), Path.Combine(outDir, "health_idle.png"));
+    }
+
+    /// <summary>Other selections worth eyeballing: notes, a hygiene entry, a shadowed built-in, a long article.</summary>
+    static void RenderSelections(string outDir, AppServices services, ScanResult result)
+    {
+        var vm = Shell(services, result);
+
+        vm.ToFindings(new FindingsQuery(NotesOnly: true));
+        Capture(vm, Path.Combine(outDir, "findings_notes.png"));
+
+        var phantom = result.Diagnosis.Groups.First(g => g.Members.Any(f => f.Rule == "SEC-03"));
+        vm.ToFindings(new FindingsQuery(RootCause: phantom.RootCause));
+        Capture(vm, Path.Combine(outDir, "findings_phantom.png"));
+
+        vm.ToEntry(Core.Model.PathScope.User, 2);
+        Capture(vm, Path.Combine(outDir, "entries_user_quotes.png"));
+
+        vm.ToCommand("where");
+        Capture(vm, Path.Combine(outDir, "shadowing_where.png"));
+
+        vm.ToLearn(Core.Detection.LearnTopics.DllSearchOrder);
+        Capture(vm, Path.Combine(outDir, "learn_dll.png"));
     }
 
     /// <summary>The "what's new" window (the post-update popup / About viewer), over the real changelog.</summary>

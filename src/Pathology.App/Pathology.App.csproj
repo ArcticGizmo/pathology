@@ -36,6 +36,8 @@
          Theming/NordTheme.cs for how its tokens map onto the brush keys the views use. -->
     <PackageReference Include="ArcticGizmo.Avalonia.Palette" Version="0.3.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!-- Renders the Learn articles (Controls/MarkdownBlock.cs), as perch does. -->
+    <PackageReference Include="Markdig" Version="1.3.2" />
     <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 

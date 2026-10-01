@@ -107,7 +107,7 @@ and **Download & install** (applies the update and restarts). Both share `Update
 All are **read-only**.
 
 ```sh
-pathology render <dir>    # every page, the changelog and the update button, to PNG
+pathology render <dir>    # every page over a made-up PC (never this one), plus posed states, to PNG
 pathology check-update    # the launch-time update check, printed
 pathology snapshot [file] # a redacted snapshot of this machine's PATH (counts only on the console)
 pathology scan [--redact] [--details] [--all] [--from file]

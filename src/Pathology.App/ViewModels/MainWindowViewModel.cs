@@ -18,9 +18,9 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
 {
     readonly HealthViewModel _health;
     readonly FindingsViewModel _findings;
-    readonly PageViewModel _entries;
-    readonly PageViewModel _shadowing;
-    readonly PageViewModel _learn;
+    readonly EntriesViewModel _entries;
+    readonly ShadowingViewModel _shadowing;
+    readonly LearnViewModel _learn;
 
     /// <summary>The scan every page reads.</summary>
     public ScanSession Session { get; }
@@ -66,32 +66,10 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
         Session = session;
         _health = new HealthViewModel(session, this);
         _findings = new FindingsViewModel(session, this);
-        _entries = new PlaceholderPageViewModel("Entries", "PATH entries",
-            "The machine and user PATH, in the order Windows searches them.",
-            "Arrives in M4.",
-            [
-                "Raw and expanded values, and the registry value kind",
-                "Who can write each folder: you, you elevated, SYSTEM, a standard user",
-                "Owners, junction targets, drive types and hygiene defects",
-            ]);
-        _shadowing = new PlaceholderPageViewModel("Shadowing", "Shadowing",
-            "Which executable actually runs when you type a command — and which copies it hides.",
-            "Arrives in M4.",
-            [
-                "A \"which\" search that walks PATH and PATHEXT the way cmd does",
-                "Commands provided by more than one folder",
-                "Built-ins that a writable, earlier folder could shadow",
-            ]);
-        _learn = new PlaceholderPageViewModel("Learn", "Learn",
-            "Short notes on how Windows really resolves commands and DLLs.",
-            "Arrives in M4.",
-            [
-                "DLL search order and phantom directories",
-                "PATHEXT precedence",
-                "How UAC and elevated sessions inherit PATH",
-                "REG_SZ vs REG_EXPAND_SZ, and why not setx",
-            ]);
-        Settings = new SettingsViewModel(services);
+        _entries = new EntriesViewModel(session, this);
+        _shadowing = new ShadowingViewModel(session, this);
+        _learn = new LearnViewModel();
+        Settings = new SettingsViewModel(services, session);
         About = new AboutViewModel();
 
         // Settings + About are navigable (so they get active-state highlighting) but live in the bottom nav
@@ -125,14 +103,30 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
         CurrentPage = _findings;
     }
 
-    /// <summary>The Findings page (the renderer selects into it).</summary>
+    public void ToEntry(PathScope scope, int index)
+    {
+        _entries.Select(scope, index);
+        CurrentPage = _entries;
+    }
+
+    public void ToLearn(string topic)
+    {
+        _learn.Open(topic);
+        CurrentPage = _learn;
+    }
+
+    public void ToCommand(string command)
+    {
+        _shadowing.Show(command);
+        CurrentPage = _shadowing;
+    }
+
+    // The pages, for the renderer to pose.
+    public HealthViewModel Health => _health;
     public FindingsViewModel Findings => _findings;
-
-    public void ToEntry(PathScope scope, int index) => CurrentPage = _entries;
-
-    public void ToLearn(string topic) => CurrentPage = _learn;
-
-    public void ToCommand(string command) => CurrentPage = _shadowing;
+    public EntriesViewModel Entries => _entries;
+    public ShadowingViewModel Shadowing => _shadowing;
+    public LearnViewModel Learn => _learn;
 
     void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
     {

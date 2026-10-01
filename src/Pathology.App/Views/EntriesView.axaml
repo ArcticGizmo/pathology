@@ -1,0 +1,200 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:views="clr-namespace:Pathology.App.Views"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.EntriesView"
+             x:DataType="vm:EntriesViewModel">
+
+    <UserControl.Styles>
+        <!-- The who-can-write matrix: one 40px column per perspective, header and cells alike. -->
+        <Style Selector="TextBlock.colhead">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="32,36,32,24">
+
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <StackPanel Grid.Column="0" Spacing="3">
+                <TextBlock Classes="pagetitle" Text="PATH entries" />
+                <TextBlock Classes="help"
+                           Text="The machine PATH, then yours: the order Windows searches them. The squares show who can add files to each folder." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
+                    Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
+        </Grid>
+
+        <views:ScanStatusPanel Grid.Row="1" Margin="0,0,0,14">
+            <views:ScanStatusPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="!HasResult" />
+                    <Binding Path="IsScanning" />
+                </MultiBinding>
+            </views:ScanStatusPanel.IsVisible>
+        </views:ScanStatusPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12" IsVisible="{Binding HasResult}">
+            <ToggleButton Classes="chip" Content="Expanded" IsChecked="{Binding ShowExpanded}"
+                          ToolTip.Tip="Show each entry with its %VARIABLES% expanded, or exactly as stored" />
+            <ToggleButton Classes="chip" Content="Highlight defects" IsChecked="{Binding ShowDefects}"
+                          ToolTip.Tip="Pick out quotes, stray spaces, doubled backslashes and forward slashes" />
+        </StackPanel>
+
+        <Grid Grid.Row="3" ColumnDefinitions="1.25*,*" ColumnSpacing="14" IsVisible="{Binding HasResult}">
+
+            <Border Grid.Column="0" Classes="panel" Padding="6" MaxWidth="760">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Sections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EntrySectionViewModel">
+                                <StackPanel Margin="0,0,0,10">
+                                    <!-- Section header, with the matrix's column labels lined up over the cells. -->
+                                    <Grid ColumnDefinitions="*,Auto,22" Margin="10,10,10,6">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Classes="phead" Text="{Binding Heading}" VerticalAlignment="Center" />
+                                            <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <ItemsControl Grid.Column="1" VerticalAlignment="Bottom"
+                                                      ItemsSource="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ColumnHeaders}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <TextBlock Classes="colhead" Text="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+
+                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:EntryRowViewModel">
+                                                <Button Classes="row" Classes.selected="{Binding IsSelected}"
+                                                        Command="{Binding OpenCommand}" Padding="10,6" Margin="0,1">
+                                                    <Grid ColumnDefinitions="34,*,Auto,22">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Position}"
+                                                                   Classes="help" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                                        <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,10,0">
+                                                            <controls:DefectTextBlock Source="{Binding Text}" Classes="mono"
+                                                                                      Highlight="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ShowDefects}" />
+                                                            <TextBlock Text="{Binding Status}" FontSize="10.5"
+                                                                       Foreground="{Binding StatusBrush}"
+                                                                       IsVisible="{Binding HasStatus}" />
+                                                        </StackPanel>
+                                                        <ItemsControl Grid.Column="2" ItemsSource="{Binding Matrix}"
+                                                                      VerticalAlignment="Top" Margin="0,2,0,0">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:MatrixCellViewModel">
+                                                                    <Panel Width="40" Height="14" Background="Transparent"
+                                                                           ToolTip.Tip="{Binding Tip}">
+                                                                        <Border Width="12" Height="12" CornerRadius="3"
+                                                                                BorderThickness="1.5"
+                                                                                Background="{Binding Fill}"
+                                                                                BorderBrush="{Binding Stroke}" />
+                                                                        <TextBlock Text="{Binding Dash}" FontSize="11"
+                                                                                   HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Foreground="{DynamicResource MutedBrush}" />
+                                                                    </Panel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <Ellipse Grid.Column="3" Width="8" Height="8" HorizontalAlignment="Right"
+                                                                 VerticalAlignment="Top" Margin="0,5,0,0"
+                                                                 Fill="{Binding FindingBrush}" />
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Classes="panel" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel DataContext="{Binding Detail}" x:DataType="vm:EntryDetailViewModel"
+                                Margin="22,20" Spacing="16"
+                                IsVisible="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).HasSelection}">
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="phead" Text="{Binding Heading}" />
+                            <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" FontSize="13.5" />
+                            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding StatusBrush}" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4" IsVisible="{Binding ExpandedDiffers}">
+                            <TextBlock Classes="phead" Text="AS STORED" />
+                            <controls:CharWrapTextBlock Source="{Binding Raw}" Classes="mono" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="phead" Text="WHAT'S THERE" />
+                            <ItemsControl ItemsSource="{Binding Facts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:InfoRowViewModel">
+                                        <Grid ColumnDefinitions="130,*" Margin="0,2">
+                                            <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="help" />
+                                            <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding Value}" Prose="True"
+                                                                        Classes="field" FontSize="12.5" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="phead" Text="WHO CAN WRITE TO IT" />
+                            <TextBlock Classes="help" Text="{Binding AccessNote}" IsVisible="{Binding HasAccessNote}" />
+                            <ItemsControl ItemsSource="{Binding Access}" IsVisible="{Binding HasAccess}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AccessRowViewModel">
+                                        <Grid ColumnDefinitions="130,*" Margin="0,3">
+                                            <TextBlock Grid.Column="0" Text="{Binding Who}" Classes="help" />
+                                            <StackPanel Grid.Column="1" Spacing="1">
+                                                <TextBlock Text="{Binding Can}" FontSize="12.5" Foreground="{Binding Brush}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Through, StringFormat='through {0}'}" Classes="help"
+                                                           IsVisible="{Binding HasThrough}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel Spacing="4" IsVisible="{Binding HasFindings}">
+                            <TextBlock Classes="phead" Text="FINDINGS" />
+                            <ItemsControl ItemsSource="{Binding Findings}" Margin="-8,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ProblemRowViewModel">
+                                        <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                                <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
+                                                         Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12.5"
+                                                           Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

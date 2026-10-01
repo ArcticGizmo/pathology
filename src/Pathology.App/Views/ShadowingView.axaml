@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:views="clr-namespace:Pathology.App.Views"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.ShadowingView"
+             x:DataType="vm:ShadowingViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="980" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="18">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="3">
+                    <TextBlock Classes="pagetitle" Text="Shadowing" />
+                    <TextBlock Classes="help"
+                               Text="Which file actually runs when you type a command, and which copies it hides. Resolved the way cmd does it: folder by folder in PATH order, PATHEXT order within each." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
+                        Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
+            </Grid>
+
+            <views:ScanStatusPanel>
+                <views:ScanStatusPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                        <Binding Path="!HasResult" />
+                        <Binding Path="IsScanning" />
+                    </MultiBinding>
+                </views:ScanStatusPanel.IsVisible>
+            </views:ScanStatusPanel>
+
+            <!-- Which? -->
+            <Border Classes="panel" IsVisible="{Binding HasResult}">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="phead" Text="WHICH ONE RUNS?" />
+                    <TextBox Text="{Binding Query}" PlaceholderText="Type a command: python, git, where…"
+                             FontFamily="Cascadia Code, Consolas, monospace" FontSize="13" />
+                    <TextBlock Text="{Binding QueryNote}" Classes="help" IsVisible="{Binding HasQueryNote}" />
+
+                    <StackPanel DataContext="{Binding Resolution}" x:DataType="vm:ResolutionViewModel" Spacing="8"
+                                IsVisible="{Binding $parent[UserControl].((vm:ShadowingViewModel)DataContext).HasResolution}">
+                        <TextBlock Text="{Binding Summary}" Classes="field" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding Chain}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProviderRowViewModel">
+                                    <Grid ColumnDefinitions="64,*" Margin="0,5">
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="10.5"
+                                                   FontWeight="SemiBold" LetterSpacing="1" Margin="0,2,0,0"
+                                                   Foreground="{Binding LabelBrush}" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <controls:CharWrapTextBlock Source="{Binding FullPath}" Classes="mono" />
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Text="{Binding Meta}" Classes="help" />
+                                                <TextBlock Text="{Binding Risk}" FontSize="12" Foreground="{Binding RiskBrush}"
+                                                           IsVisible="{Binding HasRisk}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Notes}" IsVisible="{Binding HasNotes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding}" Classes="help" Margin="0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <TextBlock Classes="help"
+                               Text="cmd also looks in the current folder before PATH, and PowerShell checks its aliases, functions and cmdlets first. Neither is part of PATH, so neither is shown here." />
+                </StackPanel>
+            </Border>
+
+            <!-- Windows built-ins -->
+            <Border Classes="panel" IsVisible="{Binding HasResult}">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="WINDOWS COMMANDS" />
+                    <TextBlock Classes="field" IsVisible="{Binding BuiltinsSafe}"
+                               Text="Every Windows command runs the Windows copy, and nothing ahead of System32 could be written to swap one out." />
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasShadowedBuiltins}">
+                        <TextBlock Text="Already shadowed: these run something other than Windows' own copy." Classes="field" />
+                        <ItemsControl ItemsSource="{Binding ShadowedBuiltins}" Margin="-8,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ShadowedBuiltinViewModel">
+                                    <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
+                                        <Grid ColumnDefinitions="110,*">
+                                            <TextBlock Grid.Column="0" Text="{Binding Command}" Classes="mono"
+                                                       FontWeight="SemiBold" />
+                                            <StackPanel Grid.Column="1" Spacing="1">
+                                                <TextBlock Text="{Binding By, StringFormat='runs {0}'}" FontSize="12.5"
+                                                           Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Windows, StringFormat='instead of {0}'}"
+                                                           Classes="help" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasAtRisk}">
+                        <TextBlock Classes="field" TextWrapping="Wrap"
+                                   Text="Could be shadowed: someone can write to a folder searched before System32, so any Windows command could be swapped." />
+                        <ItemsControl ItemsSource="{Binding AtRisk}" Margin="-8,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProblemRowViewModel">
+                                    <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                            <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
+                                                     Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12.5"
+                                                       Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Competing -->
+            <Border Classes="panel" IsVisible="{Binding HasResult}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="phead" Text="COMMANDS MORE THAN ONE FOLDER PROVIDES"
+                                   VerticalAlignment="Center" />
+                        <ToggleButton Grid.Column="1" Classes="chip" Content="Riskiest first"
+                                      IsChecked="{Binding SortByRisk}"
+                                      ToolTip.Tip="Put commands whose winning copy someone could replace at the top" />
+                    </Grid>
+                    <TextBlock Text="{Binding CompetingNote}" Classes="help" />
+                    <ItemsControl ItemsSource="{Binding Competing}" Margin="-8,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CompetingRowViewModel">
+                                <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
+                                    <Grid ColumnDefinitions="14,130,*,Auto">
+                                        <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Center"
+                                                 HorizontalAlignment="Left" Fill="{Binding DotBrush}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Command}" Classes="mono"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Winner}" FontSize="12.5"
+                                                   Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{Binding Hidden}" Classes="help"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding UnlistedNote}" Classes="help" IsVisible="{Binding HasUnlistedNote}" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

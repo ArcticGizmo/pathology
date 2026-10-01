@@ -1,3 +1,4 @@
+using Pathology.App.Scanning;
 using Pathology.Core.Capture;
 using Pathology.Core.Model;
 using Pathology.Core.Redaction;
@@ -19,17 +20,13 @@ internal static class SnapshotCommand
         using var services = new AppServices(Path.Combine(Path.GetTempPath(), "pathology-snapshot-" + Guid.NewGuid().ToString("N")));
 
         var snapshot = services.Capture(new CaptureOptions { ProbeNetworkPaths = false });
-        var redacted = SnapshotRedactor.Redact(snapshot);
-
-        var leaks = SnapshotRedactor.FindLeaks(PathSnapshotJson.Serialize(redacted), snapshot.Host);
-        if (leaks.Count > 0)
+        if (SnapshotExport.Write(snapshot, output) is { } refused)
         {
-            Console.Error.WriteLine($"not written: redaction left identifying values behind ({string.Join(", ", leaks)})");
+            Console.Error.WriteLine(refused);
             return 2;
         }
 
-        PathSnapshotJson.Write(output, redacted);
-
+        var redacted = SnapshotRedactor.Redact(snapshot);
         var dirs = redacted.Directories;
         Console.WriteLine(
             $"entries: {redacted.EntriesIn(PathScope.Machine).Count()} machine, {redacted.EntriesIn(PathScope.User).Count()} user; " +
