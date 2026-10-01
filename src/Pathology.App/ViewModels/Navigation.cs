@@ -20,4 +20,7 @@ public interface INavigator
 
     /// <summary>Open Shadowing with a command looked up.</summary>
     void ToCommand(string command);
+
+    /// <summary>Open Fix with this entry picked out in the editor.</summary>
+    void ToFix(PathScope scope, int index);
 }

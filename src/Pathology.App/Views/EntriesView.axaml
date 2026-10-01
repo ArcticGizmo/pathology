@@ -136,6 +136,8 @@
                             <TextBlock Classes="phead" Text="{Binding Heading}" />
                             <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" FontSize="13.5" />
                             <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding StatusBrush}" />
+                            <Button Classes="link" HorizontalAlignment="Left" FontSize="12" Content="Change it on Fix"
+                                    Command="{Binding ChangeInFixCommand}" />
                         </StackPanel>
 
                         <StackPanel Spacing="4" IsVisible="{Binding ExpandedDiffers}">

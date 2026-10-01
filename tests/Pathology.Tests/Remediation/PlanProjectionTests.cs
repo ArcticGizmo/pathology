@@ -40,7 +40,7 @@ public class PlanProjectionTests
         Assert.Equal("uac-exposure", Assert.Single(outcome.After.Health[FindingCategory.Security].Problems).RootCause);
         Assert.True(outcome.After.Health[FindingCategory.Correctness].IsClean);
         Assert.True(outcome.After.Health[FindingCategory.Hygiene].IsClean);
-        Assert.Empty(outcome.Introduced.Where(g => g.Severity > Severity.Info));
+        Assert.DoesNotContain(outcome.Introduced, g => g.Severity > Severity.Info);
         Assert.Contains(outcome.Resolved, g => g.Members.Any(f => f.Rule == "SEC-03"));
     }
 
@@ -48,7 +48,7 @@ public class PlanProjectionTests
     public void A_moved_entry_expands_in_its_new_scope()
     {
         var (diagnosis, _, fixes) = Suggest(Messy());
-        var move = Assert.Single(fixes, f => f.Edits.OfType<MoveEntry>().Any());
+        var move = Assert.Single(fixes, f => f.Edits.OfType<MoveToUser>().Any());
         var after = PlanProjection.Project(diagnosis, Changes(diagnosis, [move])).After.Snapshot;
 
         var moved = after.EntriesIn(PathScope.User).First();

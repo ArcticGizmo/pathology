@@ -475,76 +475,120 @@ the page, each pane scrolling on its own.*
 
 ---
 
-## Later milestones (outline only)
-
 ## Milestone 6 — Remediation and safe apply
 
 > **Decided 2026-10-01:** the app applies folder-permission lock-downs itself (through the elevated helper and
 > `SetSecurityInfo`, never `icacls`), as well as PATH value changes. The equivalent `icacls` commands are still
 > shown, and can be copied. Versioning is left alone: M6 lands in Unreleased.
+>
+> **Built 2026-10-01.** 408 Core/App + 51 Windows tests (93 new). The planner is checked against the real-machine
+> fixture, the ACL writer against `TempTree` folders (a lock-down reaching a subfolder by inheritance, and a
+> restore turning inheritance back on), and every page state through `pathology render`. **Not yet done:** a real
+> apply and undo by hand, with a real UAC prompt. That's the exit criterion below, and it's yours to run: nothing
+> in automation may do it.
 
 The shape is the same as the scan's: **plan purely, apply through interfaces.** Everything up to the Apply
 click is a pure function of the snapshot, so it's tested from `TestMachine` and posed by the renderer. The
 writers sit in `Pathology.Windows` behind Core interfaces, and only `AppServices` builds the real ones.
 
 ### Plan (`Pathology.Core/Remediation`, pure)
-- [ ] `PathDraft`: both values as lists of `DraftEntry` (a stable id, its text, where it came from) plus each
+- [x] `PathDraft`: both values as lists of `DraftEntry` (a stable id, its text, where it came from) plus each
       value kind. Edits are by id, not index (`RemoveEntry`, `ReplaceText`, `MoveEntry`, `AddEntry`,
-      `SetKind`), so a suggestion toggled after a manual edit replays cleanly.
-- [ ] `RemediationPlanner.Suggest`: one `SuggestedFix` per root cause it can fix, each a list of edits and/or
+      `SetKind`), so a suggestion toggled after a manual edit replays cleanly. *Also `TidyText` (cleans the
+      text as it is by then, so two hygiene fixes on one entry compose), `Reorder`, and `MoveToUser`. That puts a
+      machine entry at the front of the user PATH while keeping machine order among entries moved the same way;
+      moving two one at a time had swapped them. The trailing `;` Windows writes is kept as it was.*
+- [x] `RemediationPlanner.Suggest`: one `SuggestedFix` per root cause it can fix, each a list of edits and/or
       a folder lock-down, with the finding keys it resolves. Remove phantom, dead, relative, empty and duplicate
       entries; tidy text (quotes, edge spaces, doubled and forward slashes); `REG_SZ` → `REG_EXPAND_SZ`; move
       profile and user-only-variable entries to the user PATH; put the Windows folders first; restore the
       stock Windows entries when System32 is gone; lock down writable machine folders (and link targets),
-      reset a non-admin owner, and stop other users writing your user PATH folders.
-- [ ] `RecommendedOrder`: Windows folders, then locked-down folders, then writable ones, stable within
+      reset a non-admin owner, and stop other users writing your user PATH folders. *Ids are `fix:` + root cause,
+      so a choice survives a re-scan. Not ticked by default: Windows-first (it changes which tool wins), removing
+      a network, removable or unmounted entry, and removing an entry from another account's profile. Found in
+      review: a machine entry inside **your** profile isn't locked down (that would lock you out of your own
+      folder); the move to your user PATH is its fix. An entry your user PATH already has is removed rather than
+      moved, since moving it would only make a duplicate. UAC exposure, length, CFG and notes stay advisory.*
+- [x] `RecommendedOrder`: Windows folders, then locked-down folders, then writable ones, stable within
       each (an editor action, not a default: it can change which tool wins).
-- [ ] `PlanProjection`: re-runs the real `SnapshotCapturer` over replay readers (the proposed values, the
+- [x] `PlanProjection`: re-runs the real `SnapshotCapturer` over replay readers (the proposed values, the
       captured environment, the captured folder facts, the designed SDDLs), then the detectors and ratings. So
       the "after" is exactly what a scan of the fixed machine would say. A folder the scan never saw is probed
       read-only through the same `IDirectoryProbe` when the app supplies one, or marked "not scanned".
-- [ ] **Resolution diff** (`ResolutionDiff`): every command whose winning file changes, appears or disappears.
-- [ ] Rating diff and findings resolved / introduced.
-- [ ] `IAclDesigner`: the new SDDL for a lock-down, computed from the captured one. Copy inherited entries,
+      *Limit: a hand-added entry using a variable whose value the scan didn't capture stays unexpanded in the
+      projection.*
+- [x] **Resolution diff** (`PlanProjection.CompareCommands`): every command whose winning file changes, appears
+      or disappears, Windows commands first.
+- [x] Rating diff and findings resolved / introduced. *Problems are matched by rule plus root cause, and by
+      entry text only for position-based causes. Matching by entries had made the UAC summary look both resolved
+      and new whenever its folder list changed.*
+- [x] `IAclDesigner` (`AclDesigner` in Windows, over `RawSecurityDescriptor`): the new SDDL for a lock-down,
+      computed from the captured one. Copy inherited entries,
       protect the DACL, strip write-class rights from every non-administrative trustee (keeping read &
       execute), make sure Administrators and SYSTEM keep full control, and optionally make Administrators the
-      owner. Lines describing the change, and the equivalent `icacls` commands.
-- [ ] `ChangeSet`: the concrete writes (each value before → after, each folder's SDDL before → after), split
+      owner. Lines describing the change, and the equivalent `icacls` commands. *CREATOR OWNER and the fix's own
+      trustee (you, for your user PATH folder; you get modify added if you'd otherwise lose it) are kept.
+      Object/callback entries are refused, not guessed at. `AclPlanner` handles nested folders: the outermost
+      gets the full lock-down, and one inside it with only inherited write access gets nothing of its own
+      (`InheritedOnly`: inheritance carries the change). One with its own write entries gets those trimmed with
+      inheritance left on (`OwnEntriesOnly`).*
+- [x] `ChangeSet`: the concrete writes (each value before → after, each folder's SDDL before → after), split
       into *as you* and *needs admin*.
 
 ### Apply (`Pathology.Core/Remediation` orchestration, `Pathology.Windows` writers)
-- [ ] Dry run by default: the Fix page is the dry run. Apply asks for explicit confirmation.
-- [ ] `ChangeApplier`: refuse if anything changed since the scan (each value and SDDL is re-read and compared
+- [x] Dry run by default: the Fix page is the dry run. Apply asks for explicit confirmation.
+- [x] `ChangeApplier`: refuse if anything changed since the scan (each value and SDDL is re-read and compared
       with the plan's "before"), refuse a value over 32,767 characters, write the backup record **before** any
       write, run the elevated batch first (so a cancelled UAC prompt changes nothing), then the as-you part,
-      re-read and verify each write, broadcast, and record the outcome step by step.
-- [ ] `IPathValueStore` → `RegistryPathValueStore`: writes the existing `Path` value name with the planned kind
-      (`REG_EXPAND_SZ` preserved), never truncates, never uses `setx`, re-reads to verify.
-- [ ] `IAclStore` → `SecurityDescriptorStore`: `SetSecurityInfo` on a handle opened with
+      re-read and verify each write, broadcast, and record the outcome step by step. *A refusal writes nothing
+      and leaves no record. A folder's "before" is compared on its own entries, owner and inheritance setting,
+      since a parent locked down earlier in the same apply legitimately changes its inherited ones.*
+- [x] `IPathValueStore` → `RegistryPathValueStore`: writes the existing `Path` value name with the planned kind
+      (`REG_EXPAND_SZ` preserved), never truncates, never uses `setx`, re-reads to verify. *No test against the
+      real registry, by rule; its logic is a dozen lines.*
+- [x] `IAclStore` → `SecurityDescriptorStore`: `SetSecurityInfo` on a handle opened with
       `FILE_FLAG_OPEN_REPARSE_POINT`, refusing reparse points and anything not on a local fixed drive.
       Inheritable entries propagate to the folder's children, as icacls does. A restore re-enables inheritance
-      when the old DACL had it.
-- [ ] `IEnvironmentBroadcast` → `WM_SETTINGCHANGE` "Environment" via `SendMessageTimeout`.
-- [ ] Elevated helper: `pathology apply-elevated <batch.json> <sha256>`, launched with `runas`, one UAC prompt per
-      apply. It hashes the bytes it parses, refuses a mismatch, applies **only** the machine value and folder
-      SDDLs in the batch (each with its own concurrency check and verify), and writes a result file beside it.
-- [ ] History (`ChangeHistory`, `%LOCALAPPDATA%\PATHology Data\history`): one record per apply, written before
+      when the old DACL had it. *Every component of the route is checked from the root down before anything is
+      opened, and subst drives are refused. The handle is `NtOpenFile` with backup intent, so the helper's restore
+      privilege can fix a folder whose DACL leaves administrators out.*
+- [x] `IEnvironmentBroadcast` → `WM_SETTINGCHANGE` "Environment" via `SendMessageTimeout`.
+- [x] Elevated helper: `pathology apply-elevated <batch.json> <sha256> <pipe>`, launched with `runas`, one UAC
+      prompt per apply. It hashes the bytes it parses, refuses a mismatch, applies **only** the machine value and
+      folder SDDLs in the batch (each with its own concurrency check and verify). *Changed from "writes a result
+      file beside it": an elevated process writing into a user-controlled folder can be redirected by a junction
+      into somewhere protected. It writes no file, and reports over a pipe the app created first, as an anonymous
+      client so the app can't borrow its token. The app reads every write back and goes by what it finds, not by
+      the report. See packaging.md.*
+- [x] History (`FileChangeHistory`, `%LOCALAPPDATA%\PATHology Data\history`): one record per apply, written before
       the first write. Undo builds a new change set (before = the live state, after = the record's before),
-      so an undo is itself undoable.
+      so an undo is itself undoable. *Only writes that were applied are reversed; the original is marked
+      `UndoneBy`.*
 
 ### UI
-- [ ] A **Repair** nav section: **Fix** (suggestions, the editor, what changes, Apply) and **History** (each
-      change, its outcome, Undo).
-- [ ] Editor on the Fix page rather than Entries: Entries shows what is, Fix shows what will be. An entry's
-      detail on Entries links to it on Fix.
-- [ ] What changes: ratings before → after, each value's diff, each folder's permission change with its
-      icacls equivalent (copyable), command resolution changes, and what needs a UAC prompt.
-- [ ] After an apply: re-scan, and the plan rebuilds from the new snapshot.
-- [ ] Renderer poses: suggestions, an edited draft, the confirm step, a finished apply, history with an undo.
+- [x] A **Repair** nav section: **Fix** (suggestions, the editor, what changes, Apply) and **History** (each
+      change, its outcome, Undo). *Fix's badge counts the fixes ticked by default.*
+- [x] Editor on the Fix page rather than Entries: Entries shows what is, Fix shows what will be. An entry's
+      detail on Entries links to it on Fix ("Change it on Fix" picks the row out).
+- [x] What changes: ratings before → after, each value's diff, each folder's permission change with its
+      icacls equivalent (copyable), command resolution changes, and what needs a UAC prompt. *The diff marks
+      only the entries outside the longest unchanged run as moved, so a reorder shows the one entry that jumped,
+      not everything it passed. Empty entries read "(empty)", and edge spaces show as `·`.*
+- [x] After an apply: re-scan, and the plan rebuilds from the new snapshot.
+- [x] Renderer poses: suggestions, an edited draft, the confirm step, a finished apply, history with an undo.
+      *`fix_windows_first`, `fix_edited` (rendered tall to show the editor), `fix_confirm`, `fix_applied`,
+      `fix_clean`, `history_undo`, `history_empty`. Over `PosedRepair`, whose Apply and Undo throw.*
 
 ### Rules
-- [ ] `CLAUDE.md` extended: writers are never invoked from tests, the renderer, a verb or a shell call; the
+- [x] `CLAUDE.md` extended: writers are never invoked from tests, the renderer, a verb or a shell call; the
       helper is never launched speculatively; Windows tests may write ACLs only on `TempTree` folders.
+
+### Exit criterion
+- [ ] **By hand, on the dev PC** ([manual-testing.md](manual-testing.md) §4): apply a user-only fix (no
+      prompt), apply a machine fix and a lock-down (one prompt), decline a prompt, undo each, and re-scan to
+      see the ratings move back.
+
+## Later milestones (outline only)
 
 ### ~~M7 — CLI and reporting~~ (not required)
 

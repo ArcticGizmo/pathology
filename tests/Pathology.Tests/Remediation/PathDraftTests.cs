@@ -50,6 +50,25 @@ public class PathDraftTests
         Assert.Equal((PathScope.User, 0), draft.Locate(1));
     }
 
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    public void Entries_moved_to_the_user_path_keep_their_machine_order_whichever_goes_first(int first, int second)
+    {
+        var draft = Draft(@"C:\A;C:\B;C:\C", @"C:\U").Apply([new MoveToUser(first), new MoveToUser(second)]);
+
+        Assert.Equal(@"C:\A", draft.ValueOf(PathScope.Machine));
+        Assert.Equal(@"C:\B;C:\C;C:\U", draft.ValueOf(PathScope.User));
+    }
+
+    [Fact]
+    public void MoveToUser_leaves_a_user_entry_where_it_is()
+    {
+        var draft = Draft(@"C:\A", @"C:\U;C:\V").Apply(new MoveToUser(2));
+
+        Assert.Equal(@"C:\U;C:\V", draft.ValueOf(PathScope.User));
+    }
+
     [Fact]
     public void Moving_within_a_scope_counts_the_index_once_the_entry_is_out()
     {

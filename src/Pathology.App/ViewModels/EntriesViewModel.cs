@@ -207,10 +207,12 @@ public sealed partial class EntryRowViewModel : ViewModelBase
 public sealed partial class EntryDetailViewModel : ViewModelBase
 {
     readonly INavigator _navigator;
+    readonly PathEntry _entry;
 
     public EntryDetailViewModel(PathEntry entry, ScanResult result, INavigator navigator)
     {
         _navigator = navigator;
+        _entry = entry;
         var snapshot = result.Snapshot;
         var resolved = result.Context.Resolve(entry);
         var own = resolved.Own;
@@ -280,6 +282,10 @@ public sealed partial class EntryDetailViewModel : ViewModelBase
 
     public IReadOnlyList<ProblemRowViewModel> Findings { get; }
     public bool HasFindings => Findings.Count > 0;
+
+    /// <summary>Open it in Fix's editor, to move, change or remove it.</summary>
+    [RelayCommand]
+    private void ChangeInFix() => _navigator.ToFix(_entry.Scope, _entry.Index);
 
     static string FormText(PathForm form) => form switch
     {

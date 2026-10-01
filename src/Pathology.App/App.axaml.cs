@@ -27,7 +27,8 @@ public partial class App : Application
             var session = new ScanSession((progress, cancel) => services.Capture(progress, cancel));
             var main = new MainWindow
             {
-                DataContext = new MainWindowViewModel(services, session),
+                // The one place the real repair service (the writers) reaches the UI.
+                DataContext = new MainWindowViewModel(services, session, services.Repair),
                 Title = MainWindowViewModel.TitleFor(),
             };
 

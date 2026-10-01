@@ -9,6 +9,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Fix** — PATHology now fixes what it finds, not just tuts at it. Tick the fixes (the safe ones come
+  pre-ticked), nudge the PATH around by hand if you like, and see exactly what would change before anything
+  does: the ratings before and after, every entry added, removed or moved, every folder's new permissions, and
+  every command that would start running something else.
+- **Folder lock-downs** — writable PATH folders get their permissions trimmed to read & execute for everyone
+  but administrators, applied by the app itself, with the equivalent icacls commands on offer to copy.
+  A folder inside your own profile gets moved to your user PATH instead, because locking you out of your own
+  folder is technically secure.
+- **One UAC prompt per apply, and only when needed** — changes to your user PATH never ask. The elevated helper
+  checks the change it's handed against a hash, writes nothing else, and is believed only after its work has
+  been read back.
+- **History and Undo** — every apply backs up what it replaces first, records each write, and can be undone in
+  one click. The undo is undoable too, for the indecisive.
+- **Nothing changed since the scan, or nothing changes** — an apply that finds your PATH or a folder different
+  from what the scan saw refuses the lot rather than guessing.
 - **The PATHology app** — Health, Findings, Entries, Shadowing and Learn, in Nord (Dark), all drawn from one
   read-only scan that runs when the app opens (switchable in Settings) and again on Re-scan.
 - **Health** — the three ratings side by side, what's holding each one up, and the worst few problems, plus

@@ -176,7 +176,7 @@ public static class RemediationPlanner
 
             return Fix(
                 title: $"Move {Words.Display(scanned)} to your user PATH",
-                edits: [new MoveEntry(id, PathScope.User, 0)],
+                edits: [new MoveToUser(id)],
                 note: "It goes first in your user PATH, so it's still searched before your other entries. Other accounts stop seeing it.");
         }
 
@@ -214,6 +214,10 @@ public static class RemediationPlanner
             {
                 if (context.Snapshot.EntriesIn(entry.Scope).FirstOrDefault(e => e.Index == entry.Index) is not { } scanned) continue;
                 if (context.Resolve(scanned).Final is not { Exists: true, IsDirectory: true } folder) continue;
+                // A machine entry inside your own profile is fixed by moving it to your user PATH (COR-04), not by
+                // locking you out of your own folder.
+                if (entry.Scope == PathScope.Machine && context.UserProfileKey is { } mine && DetectionContext.IsUnder(PathText.Key(folder.Path), mine))
+                    continue;
                 var fix = new AclFix
                 {
                     Folder = folder.Path,
@@ -311,6 +315,7 @@ public static class RemediationPlanner
         AddEntry a => a.Scope == PathScope.Machine,
         Reorder r => r.Scope == PathScope.Machine,
         MoveEntry m when m.Scope == PathScope.Machine => true,
+        MoveToUser => true,
         // An existing entry's id is its position in search order, so a machine entry's id is below the machine count.
         RemoveEntry or ReplaceText or TidyText or MoveEntry => IdOf(edit) < context.Snapshot.EntriesIn(PathScope.Machine)
             .Count(e => !e.Defects.HasFlag(HygieneDefects.TrailingSeparator)),

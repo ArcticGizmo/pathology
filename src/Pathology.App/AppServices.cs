@@ -1,3 +1,4 @@
+using Pathology.App.Repair;
 using Pathology.Core.Capture;
 using Pathology.Core.Model;
 using Pathology.Core.Settings;
@@ -19,6 +20,7 @@ public sealed class AppServices : IDisposable
 {
     readonly Lazy<AccessEvaluator> _evaluator = new(() => new AccessEvaluator());
     readonly Lazy<SnapshotCapturer> _capturer;
+    readonly Lazy<IRepairService> _repair;
 
     public IPathologyPaths Paths { get; }
     public ISettingsStore Settings { get; }
@@ -29,7 +31,15 @@ public sealed class AppServices : IDisposable
         Paths = new PathologyPaths(root);
         Settings = new FileSettingsStore(Paths);
         _capturer = new(() => WindowsCapture.Create(_evaluator.Value));
+        _repair = new(() => new MachineRepair(Paths, _evaluator.Value));
     }
+
+    /// <summary>
+    /// The real repair service: it writes the registry PATH values and folder ACLs, and elevates to do it. Only
+    /// <c>App</c> hands it to the shell, and the shell only reaches its writes from a click on Apply or Undo. Never
+    /// call it from a test, the renderer or a verb (see CLAUDE.md).
+    /// </summary>
+    public IRepairService Repair => _repair.Value;
 
     /// <summary>
     /// Scan this machine's PATH into a snapshot. Read-only and side-effect free; network paths are probed only

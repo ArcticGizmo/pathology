@@ -34,9 +34,19 @@ helper — run **only from production code driven by a real user click**:
 - Never invoke the elevated helper speculatively (it raises a UAC prompt) or to "check elevation works".
 - Tests cover writers against fakes and temp directories only. A test that touches the real registry, the
   real `PATH`, or a real `Program Files` / drive-root ACL is a bug in the test, however green it goes.
-- Tests **may** set ACLs on temp directories they created, to exercise the access evaluator.
+- Tests **may** set ACLs on temp directories they created, to exercise the access evaluator and
+  `SecurityDescriptorStore` (only ever on a `TempTree` folder).
 - Real targets are resolved in exactly one place — the composition root, `AppServices` — and injected
   everywhere else, so a test physically can't be pointed at the real machine.
+- Where the writers live: `RegistryPathValueStore`, `SecurityDescriptorStore`, `EnvironmentBroadcast` and
+  `ElevatedHelperLauncher` in `Pathology.Windows` (write P/Invokes are in `Native/NativeWriteMethods.cs`), reached
+  only through `AppServices.Repair` → `MachineRepair`. `App` is the only caller of `AppServices.Repair`. The shell
+  takes an `IRepairService`, and the renderer and tests pass `PosedRepair` or a recording fake, whose `Apply` and
+  `Undo` refuse or record. Never construct `MachineRepair` or call `AppServices.Repair` from a test.
+- Never run `pathology apply-elevated` (the helper verb) by hand, from a script or from a test, and never call
+  `ElevatedHelper.Run` in-process: run elevated, it would write the real machine.
+- Everything before Apply is pure (`RemediationPlanner`, `AclPlanner`, `PlanProjection`, `AclDesigner`), so test
+  and pose that freely. The renderer poses Fix and History states on the view-models and never applies.
 
 ## 🛑 No PII in fixtures, captures or exports
 
@@ -64,7 +74,7 @@ dotnet run --project src/Pathology.App -- render ./captures/render
 powershell -NoProfile -File tools/test-install.ps1
 ```
 
-The renderer builds real view-models over a temp store and performs **no** mutating action. If a page ever
+The renderer builds real view-models over a temp store and a `PosedRepair`, and performs **no** mutating action. If a page ever
 needs a mutation to render interestingly, pose the view-model's state directly rather than executing the
 operation.
 

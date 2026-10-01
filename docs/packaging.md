@@ -89,7 +89,7 @@ the pipe, or a fork with `$env:PATHOLOGY_REPO`.
 
 `Setup.exe` installs per-user to `%LocalAppData%\Pathology` (no admin) with Start Menu and Desktop shortcuts.
 Settings live separately in `%LocalAppData%\PATHology Data`, so an uninstall — which removes the install
-folder wholesale — doesn't take them (or, from M6, your PATH backups) with it.
+folder wholesale — doesn't take them (or your PATH backups, in `history\`) with it.
 
 ## Update notifications
 
@@ -113,6 +113,26 @@ pathology snapshot [file] # a redacted snapshot of this machine's PATH (counts o
 pathology scan [--redact] [--details] [--all] [--from file]
                           # the category ratings and findings as text; exit code = High problems
 ```
+
+## The elevated helper (M6)
+
+`pathology apply-elevated <batch> <sha256> <pipe>` is **not** a command to run. It's how the app applies the
+part of a fix that needs an administrator: the machine PATH and folder permissions. On Apply the app writes the
+batch to `%LOCALAPPDATA%\PATHology Data\pending\`, then starts its own exe with `runas`, which is the one UAC
+prompt. The SHA-256 of the batch goes on the command line.
+
+- It refuses to run unelevated, and refuses a batch whose bytes don't match the hash, or that asks for anything
+  but the machine PATH and plain local folders (no UNC, no `..`, no links on the way).
+- It writes **no file**. It reports over a named pipe the app created first, connecting as an anonymous client.
+  An elevated process writing into a folder the user controls is a classic way to plant a file somewhere protected.
+- The app doesn't take the report on trust. It reads every write back and judges each step by what's actually
+  there.
+- The trust model is UAC's: anything that can make you click Yes on a prompt for `pathology.exe` could hand it a
+  batch of its own. Code signing (below) would at least put a verified publisher on that prompt.
+
+Every apply is recorded in `%LOCALAPPDATA%\PATHology Data\history\` before the first write. Each record holds the
+values and SDDLs it replaced, so it's the backup. These are real PATHs and stay on the machine: they're never
+exported or redacted.
 
 ## Dev vs installed
 

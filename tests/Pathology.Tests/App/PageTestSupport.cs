@@ -13,6 +13,7 @@ internal sealed class RecordingNavigator : INavigator
     public void ToEntry(PathScope scope, int index) => Calls.Add((scope, index));
     public void ToLearn(string topic) => Calls.Add("learn:" + topic);
     public void ToCommand(string command) => Calls.Add("command:" + command);
+    public void ToFix(PathScope scope, int index) => Calls.Add(("fix", scope, index));
 }
 
 internal static class Sessions

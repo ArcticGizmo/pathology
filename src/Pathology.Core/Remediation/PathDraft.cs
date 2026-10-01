@@ -112,6 +112,8 @@ public sealed record PathDraft
 
         MoveEntry e => Move(e),
 
+        MoveToUser e => Locate(e.Id) is { Scope: PathScope.Machine } at ? ToUserFront(EntriesIn(PathScope.Machine)[at.Index]) : this,
+
         AddEntry e when Find(e.Id) is null => Insert(e.Scope, e.Index, new DraftEntry(e.Id, e.Text, null)),
         AddEntry => this,
 
@@ -128,6 +130,18 @@ public sealed record PathDraft
         var entry = EntriesIn(at.Scope)[at.Index];
         var removed = With(at.Scope, EntriesIn(at.Scope).Where(x => x.Id != e.Id).ToList());
         return removed.Insert(e.Scope, e.Index, entry);
+    }
+
+    /// <summary>
+    /// To the front of the user PATH, after any entries already moved there that came earlier in the machine PATH, so
+    /// entries moved one by one keep the order they were searched in.
+    /// </summary>
+    PathDraft ToUserFront(DraftEntry entry)
+    {
+        static int MachineOrder(DraftEntry e) => e.Origin is { Scope: PathScope.Machine } o ? o.Index : int.MaxValue;
+        var removed = With(PathScope.Machine, Machine.Where(x => x.Id != entry.Id).ToList());
+        var index = removed.User.TakeWhile(u => MachineOrder(u) < MachineOrder(entry)).Count();
+        return removed.Insert(PathScope.User, index, entry);
     }
 
     PathDraft Insert(PathScope scope, int index, DraftEntry entry)
@@ -162,6 +176,12 @@ public sealed record TidyText(int Id, HygieneDefects Defects) : EntryEdit;
 
 /// <summary>Move an entry to <paramref name="Index"/> in <paramref name="Scope"/> (counted once it's taken out; clamped).</summary>
 public sealed record MoveEntry(int Id, PathScope Scope, int Index) : EntryEdit;
+
+/// <summary>
+/// Move a machine entry to the front of the user PATH, keeping the machine order among entries moved the same way:
+/// it was searched before every user entry, and this keeps it as close to that as the user PATH allows.
+/// </summary>
+public sealed record MoveToUser(int Id) : EntryEdit;
 
 /// <summary>Add an entry. The id comes from <see cref="PathDraft.SuggestionIdBase"/> or <see cref="PathDraft.ManualIdBase"/>.</summary>
 public sealed record AddEntry(int Id, PathScope Scope, int Index, string Text) : EntryEdit;

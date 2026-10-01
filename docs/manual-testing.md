@@ -1,7 +1,8 @@
 # Manual test matrix (M5)
 
-v1.0 is **read-only**: a scan reads the registry and each folder's permissions and writes nothing. Testing on a
-real machine is safe, and nothing below asks you to change your PATH.
+A scan is **read-only**: it reads the registry and each folder's permissions and writes nothing. Sections 1–3
+are safe on any machine and change nothing. **Section 4 (M6) does change your PATH and folder permissions**,
+on purpose, and undoes them again. Read it through before starting.
 
 Run the app from source (`dotnet run --project src/Pathology.App`: a Debug build, pink `- DEV` badge, separate
 settings store), or the published exe (see [packaging.md](packaging.md)) to test exactly what ships.
@@ -98,3 +99,50 @@ Delete the account afterwards (Settings → Accounts → Other users → Remove)
 - [ ] *Probe network paths* stays off: Health's "Network paths" line says none were probed. (This PC has no
       network entries, so the opt-in path isn't exercised here.)
 - [ ] Resize the window to its minimum (820×520): nothing overlaps, and the panes scroll.
+
+---
+
+## 4. Fix and undo (M6): this one writes
+
+Run from source (a Debug build keeps its history in `PATHology Data (Dev)`). Before you start, keep a copy you
+can restore without PATHology. From a normal prompt:
+`reg export "HKCU\Environment" %USERPROFILE%\Desktop\user-env.reg`, and from an elevated one,
+`reg export "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" %USERPROFILE%\Desktop\machine-env.reg`.
+Have a `cmd` window open throughout, and run `echo %PATH%` in a **new** one after each step.
+
+### Dry run
+- [ ] Fix lists the fixes, recommended ones ticked; the ratings show where each category would land.
+- [ ] Untick everything: "What changes" says nothing yet, and Apply is disabled.
+- [ ] Tick *Search the Windows folders first*: `where` (and anything else C:\scripts shadows) shows under
+      "Commands that would run something else". Untick it again.
+- [ ] The VS Code / profile entries offer **Move … to your user PATH**, never a lock-down.
+- [ ] Entries → pick `C:\scripts` → *Change it on Fix*: the row is highlighted in the editor.
+- [ ] Edit a row, move one up, move one to the other scope, add `C:\Temp\nothing`: each shows in the diff, and
+      "Reset my edits" puts them back. Nothing has been written (a new `cmd`'s PATH is unchanged).
+
+### A user-only change (no prompt)
+- [ ] Tick only the user-PATH hygiene/empty-entry fix(es). The admin line says "No UAC prompt".
+- [ ] Apply → confirm. **No UAC prompt** appears. Status says Done; History has the record, APPLIED.
+- [ ] A new `cmd` shows the tidied PATH. Re-scan: Hygiene improved, and the user PATH is still **REG_SZ**
+      (Entries).
+- [ ] History → Undo → confirm: the user PATH is back exactly (compare with `user-env.reg`), and the record
+      reads UNDONE with an "Undo of …" record above it.
+
+### A machine change and a lock-down (one prompt)
+- [ ] Tick one phantom removal (`C:\Android\…`) and *Lock down the 7 folders that inherit write access from
+      C:\*. The admin line says one UAC prompt, for the machine PATH and the folders.
+- [ ] Apply → confirm → **decline** the UAC prompt: CANCELLED, nothing changed (a new `cmd`'s PATH is the same,
+      and Entries still shows `C:\scripts` writable after a re-scan).
+- [ ] Apply again → **accept**: exactly **one** prompt. Done; every step "done".
+- [ ] Re-scan: SEC-05 and that SEC-03 are gone; `C:\scripts` and `C:\programs\Python313\Scripts` show hollow
+      under *Std* and *You*. `icacls C:\scripts` shows inheritance off and Authenticated Users with (RX) only.
+- [ ] `pip --version` still runs; `pip install` into it now needs an elevated prompt (that's the trade-off the
+      fix's note mentions).
+- [ ] History → Undo → accept the prompt: `icacls C:\scripts` shows inherited entries again, the phantom entry is
+      back in the machine PATH, and a re-scan matches the start of this section.
+
+### Things that must never happen
+- [ ] A UAC prompt for a user-only change, or more than one prompt for one apply.
+- [ ] Any file appearing in `PATHology Data (Dev)\pending` that outlives an apply.
+- [ ] A PATH value changing kind (REG_SZ ↔ REG_EXPAND_SZ) without the fix that says so.
+- [ ] Anything changed after declining the prompt.

@@ -7,6 +7,7 @@ using Pathology.App.ViewModels;
 using Pathology.App.Views;
 using Pathology.Core.Capture;
 using Pathology.Core.Changelog;
+using Pathology.Core.Remediation;
 
 namespace Pathology.App.Rendering;
 
@@ -53,6 +54,7 @@ internal static class HeadlessRenderer
 
                 RenderHealthStates(outDir, services);
                 RenderSelections(outDir, services, messy);
+                RenderRepair(outDir, services, messy);
                 RenderChangelog(outDir);
                 RenderUpdateButton(outDir, services, messy);
             }
@@ -79,8 +81,9 @@ internal static class HeadlessRenderer
         return session;
     }
 
+    /// <summary>The shell over a posed result, with a repair service that refuses to write and a posed history.</summary>
     static MainWindowViewModel Shell(AppServices services, ScanResult? result) =>
-        new(services, PosedSession(result), checkForUpdates: false);
+        new(services, PosedSession(result), new PosedRepair(PosedRepair.PosedHistory()), checkForUpdates: false);
 
     /// <summary>
     /// Health when everything is clean, part-way through a scan, and before any scan; then the worst case and an
@@ -132,6 +135,54 @@ internal static class HeadlessRenderer
         Capture(vm, Path.Combine(outDir, "learn_dll.png"));
     }
 
+    /// <summary>
+    /// Fix and History in the states worth checking: a reorder that changes which command runs, hand edits, the
+    /// confirm step, a finished apply, an empty history and an undo being confirmed. Every state is posed on the
+    /// view-models; the repair service would throw if anything tried to apply.
+    /// </summary>
+    static void RenderRepair(string outDir, AppServices services, ScanResult result)
+    {
+        var vm = Shell(services, result);
+        vm.CurrentPage = vm.Fix;
+
+        vm.Fix.Fixes.Single(f => f.Fix.Id == RemediationPlanner.WindowsFirstId).IsSelected = true;
+        Capture(vm, Path.Combine(outDir, "fix_windows_first.png"));
+
+        var user = vm.Fix.Sections[1].Rows;
+        user[^1].RemoveCommand.Execute(null);
+        vm.Fix.Sections[1].Rows[0].MoveUpCommand.Execute(null);
+        vm.Fix.Sections[0].Rows[^1].MoveScopeCommand.Execute(null);
+        vm.Fix.NewEntryText = @"C:\Users\you\AppData\Local\Programs\tool\bin";
+        vm.Fix.AddCommand.Execute(null);
+        vm.Fix.Sections[1].Rows[0].BeginEditCommand.Execute(null);
+        // Tall, so the editor below the fixes is in the picture too.
+        Capture(vm, Path.Combine(outDir, "fix_edited.png"), height: 2300);
+
+        var confirm = Shell(services, result);
+        confirm.CurrentPage = confirm.Fix;
+        confirm.Fix.IsConfirming = true;
+        Capture(confirm, Path.Combine(outDir, "fix_confirm.png"));
+
+        var done = Shell(services, result);
+        done.CurrentPage = done.Fix;
+        done.Fix.PoseOutcome(PosedRepair.PosedHistory()[0]);
+        Capture(done, Path.Combine(outDir, "fix_applied.png"));
+
+        var clean = Shell(services, ScanResult.Of(PosedMachines.Clean()));
+        clean.CurrentPage = clean.Fix;
+        Capture(clean, Path.Combine(outDir, "fix_clean.png"));
+
+        var history = Shell(services, result);
+        history.CurrentPage = history.History;
+        history.History.Selected = history.History.Rows[2];
+        history.History.IsConfirming = true;
+        Capture(history, Path.Combine(outDir, "history_undo.png"));
+
+        var empty = new MainWindowViewModel(services, PosedSession(result), new PosedRepair(), checkForUpdates: false);
+        empty.CurrentPage = empty.History;
+        Capture(empty, Path.Combine(outDir, "history_empty.png"));
+    }
+
     /// <summary>The "what's new" window (the post-update popup / About viewer), over the real changelog.</summary>
     static void RenderChangelog(string outDir)
     {
@@ -156,9 +207,10 @@ internal static class HeadlessRenderer
         Capture(vm, Path.Combine(outDir, "update_available.png"));
     }
 
-    static void Capture(MainWindowViewModel vm, string path)
+    static void Capture(MainWindowViewModel vm, string path, double? height = null)
     {
         var window = new MainWindow { DataContext = vm };
+        if (height is { } h) window.Height = h;
         window.Show();
         Dispatcher.UIThread.RunJobs();
         window.CaptureRenderedFrame()?.Save(path);

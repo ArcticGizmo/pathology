@@ -73,7 +73,7 @@ public class RemediationPlannerTests
         var (diagnosis, _, fixes) = Suggest(Messy());
         var fix = FixFor(fixes, diagnosis, "COR-01");
 
-        Assert.Equal([new MoveEntry(4, PathScope.User, 0)], fix.Edits);
+        Assert.Equal([new MoveToUser(4)], fix.Edits);
         Assert.True(fix.NeedsAdmin);
     }
 
@@ -129,6 +129,19 @@ public class RemediationPlannerTests
         var (_, _, fixes) = Suggest(new TestMachine(@"%SystemRoot%\system32;%SystemRoot%;C:\Tools"));
 
         Assert.DoesNotContain(fixes, f => f.Id == RemediationPlanner.WindowsFirstId);
+    }
+
+    [Fact]
+    public void A_machine_entry_in_your_own_profile_is_moved_not_locked_against_you()
+    {
+        var m = new TestMachine(@"%SystemRoot%\system32;C:\Users\you\tools");
+        m.Folder(@"C:\Users\you", f => f.WritableByYou());
+        m.Folder(@"C:\Users\you\tools", f => f.WritableByYou());
+        var (diagnosis, _, fixes) = Suggest(m);
+
+        Assert.Contains(diagnosis.Findings, f => f.Rule == "SEC-01");
+        Assert.DoesNotContain(fixes, f => f.Acls.Any(a => a.Folder == @"C:\Users\you\tools"));
+        Assert.Equal([new MoveToUser(1)], FixFor(fixes, diagnosis, "COR-04").Edits);
     }
 
     [Fact]

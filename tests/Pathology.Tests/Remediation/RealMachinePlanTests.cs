@@ -28,11 +28,20 @@ public class RealMachinePlanTests
     public void Every_high_problem_with_a_fix_gets_one_and_the_rest_are_advisory()
     {
         var fixedCauses = Fixes.SelectMany(f => f.RootCauses).ToHashSet();
-        var unfixed = Diagnosis.Groups.Where(g => g.Severity == Severity.High && !fixedCauses.Contains(g.RootCause))
-            .Select(g => g.Primary.Rule).Distinct().Order().ToList();
+        var unfixed = Diagnosis.Groups.Where(g => g.Severity == Severity.High && !fixedCauses.Contains(g.RootCause)).ToList();
 
         // The length limit is fixed by removing things, not by one edit of its own.
-        Assert.Equal(["COR-08"], unfixed);
+        Assert.Contains(unfixed, g => g.Primary.Rule == "COR-08");
+
+        // A writable machine folder inside the profile isn't locked down: the entry moves (or goes) instead.
+        var draft = PathDraft.From(Snapshot);
+        var moved = Fixes.SelectMany(f => f.Edits).Select(e => e switch { MoveToUser m => m.Id, RemoveEntry r => r.Id, _ => -1 }).ToHashSet();
+        foreach (var group in unfixed.Where(g => g.Primary.Rule != "COR-08"))
+        {
+            Assert.Equal("SEC-01", group.Primary.Rule);
+            Assert.All(group.Primary.Entries, e =>
+                Assert.Contains(draft.All.Single(d => d.Origin == new EntryOrigin(e.Scope, e.Index)).Id, moved));
+        }
     }
 
     [Fact]
@@ -52,7 +61,7 @@ public class RealMachinePlanTests
 
         Assert.NotEqual(Severity.High, outcome.After.Health[FindingCategory.Security].Rating);
         Assert.True(outcome.After.Health[FindingCategory.Hygiene].IsClean);
-        Assert.Empty(outcome.Introduced.Where(g => g.Severity > Severity.Low));
+        Assert.DoesNotContain(outcome.Introduced, g => g.Severity > Severity.Low);
         Assert.Contains(outcome.Resolved, g => g.RootCause == @"inherited:C:\");
     }
 

@@ -30,6 +30,12 @@ internal static class Program
         if (args.Length > 0 && args[0] == "scan")
             return ScanCommand.Run(args[1..]);
 
+        // `pathology apply-elevated <batch> <sha256> <pipe>` is the elevated helper: the app starts it with runas (one
+        // UAC prompt) to write the machine PATH and folder permissions it was handed, and nothing else. It refuses to
+        // run unelevated, checks the batch against its hash, and writes no file. Never run it by hand or from a script.
+        if (args.Length > 0 && args[0] == Windows.ElevatedHelperLauncher.Verb)
+            return Windows.ElevatedHelper.Run(args[1..]);
+
         // `pathology check-update` runs the notify-only update check and prints the result — a headless
         // probe of the same path the UI uses on launch (honours PATHOLOGY_UPDATE_FEED).
         if (args.Length > 0 && args[0] == "check-update")

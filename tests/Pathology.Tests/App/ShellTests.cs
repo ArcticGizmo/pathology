@@ -15,7 +15,7 @@ public class ShellTests
         using var services = new AppServices(store.Root);
         var session = Sessions.Showing(PosedMachines.Messy());
 
-        var vm = new MainWindowViewModel(services, session, checkForUpdates: false);
+        var vm = new MainWindowViewModel(services, session, new PosedRepair(), checkForUpdates: false);
 
         Assert.Equal(session.Current!.Health.Count(Severity.High), vm.Findings.NavCount);
         Assert.True(vm.Findings.NavCount > 0);
@@ -23,11 +23,28 @@ public class ShellTests
     }
 
     [Fact]
+    public void Fix_and_History_sit_in_their_own_Repair_section()
+    {
+        using var store = new TempStore();
+        using var services = new AppServices(store.Root);
+        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
+
+        var labels = vm.NavItems.Select(i => i is NavHeaderViewModel h ? "#" + h.Label : ((PageViewModel)i).Title).ToList();
+        Assert.Equal(["#Diagnose", "Health", "Findings", "Entries", "Shadowing", "#Repair", "Fix", "History", "#Understand", "Learn"], labels);
+        Assert.True(vm.Fix.NavCount > 0);
+
+        vm.Entries.Select(PathScope.Machine, 0);
+        vm.Entries.Detail!.ChangeInFixCommand.Execute(null);
+        Assert.Same(vm.Fix, vm.CurrentPage);
+        Assert.Contains(vm.Fix.Sections.SelectMany(s => s.Rows), r => r.IsHighlighted);
+    }
+
+    [Fact]
     public void Navigating_lands_on_the_page_with_the_thing_selected()
     {
         using var store = new TempStore();
         using var services = new AppServices(store.Root);
-        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), checkForUpdates: false);
+        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
 
         vm.ToEntry(PathScope.User, 1);
         Assert.Same(vm.Entries, vm.CurrentPage);
