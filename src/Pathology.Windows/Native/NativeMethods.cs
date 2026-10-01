@@ -6,7 +6,8 @@ namespace Pathology.Windows.Native;
 /// <summary>
 /// The Win32 surface PATHology reads through. Every call here is a query: no file, registry value or ACL is
 /// created or changed. (The only write-shaped call, <c>DeviceIoControl</c>, is used with
-/// <c>FSCTL_GET_REPARSE_POINT</c>, which reads.)
+/// <c>FSCTL_GET_REPARSE_POINT</c>, which reads.) The calls that do change things are in
+/// <c>NativeWriteMethods.cs</c>.
 /// </summary>
 internal static unsafe partial class NativeMethods
 {

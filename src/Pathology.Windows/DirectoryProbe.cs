@@ -258,7 +258,7 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
     /// <c>NtOpenFile</c> for exactly <paramref name="access"/> (no implied <c>SYNCHRONIZE</c>), opening a link as
     /// itself. The handle is asynchronous, so it's only good for queries such as <c>GetSecurityInfo</c>.
     /// </summary>
-    static SafeFileHandle? OpenExact(string canonicalPath, uint access, out int error)
+    internal static SafeFileHandle? OpenExact(string canonicalPath, uint access, out int error)
     {
         var nt = PathText.Classify(canonicalPath) switch
         {
@@ -279,7 +279,7 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
         }
     }
 
-    static uint? TagOf(SafeFileHandle handle)
+    internal static uint? TagOf(SafeFileHandle handle)
     {
         FILE_ATTRIBUTE_TAG_INFO info;
         return GetFileInformationByHandleEx(handle, FileAttributeTagInfo, &info, (uint)sizeof(FILE_ATTRIBUTE_TAG_INFO))
@@ -289,7 +289,7 @@ public sealed unsafe class DirectoryProbe : IDirectoryProbe
     }
 
     /// <summary>Owner SID and SDDL (owner, group, DACL, label) from an open handle.</summary>
-    static (string Owner, string Sddl) ReadSecurity(SafeFileHandle handle)
+    internal static (string Owner, string Sddl) ReadSecurity(SafeFileHandle handle)
     {
         const uint info = OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | LABEL_SECURITY_INFORMATION;
         nint owner, descriptor;

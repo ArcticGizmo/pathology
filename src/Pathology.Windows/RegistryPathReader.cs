@@ -30,7 +30,7 @@ public sealed class RegistryPathReader : IRegistryPathReader
             ReadAll(@volatile));
     }
 
-    static RawPathValue ReadPath(RegistryKey? key, PathScope scope)
+    internal static RawPathValue ReadPath(RegistryKey? key, PathScope scope)
     {
         var name = key?.GetValueNames().FirstOrDefault(n => string.Equals(n, "Path", StringComparison.OrdinalIgnoreCase));
         if (key is null || name is null) return RawPathValue.Missing(scope);
