@@ -138,6 +138,23 @@
         <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
     </Style>
 
+    <!-- .disclosure folds a section away: a chromeless link-coloured toggle whose chevron turns when it's open.
+         (Fluent's Expander paints its own header, which the palette doesn't reach.) -->
+    <Style Selector="ToggleButton.disclosure">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.disclosure:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.disclosure:pressed /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.disclosure:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.disclosure:checked TextBlock.chevron">
+        <Setter Property="RenderTransform" Value="rotate(90deg)" />
+    </Style>
+
     <!-- Status text colouring, driven by a bound class. :is() for the same reason as .mono above —
          status lines carry error text, which is the thing users most want to copy. -->
     <Style Selector=":is(TextBlock).status.ok"><Setter Property="Foreground" Value="{DynamicResource OkBrush}" /></Style>

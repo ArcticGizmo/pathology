@@ -33,7 +33,7 @@ public sealed partial class ShadowingViewModel : ScanPageViewModel
     [ObservableProperty] private string _competingNote = "";
 
     [ObservableProperty] private IReadOnlyList<ShadowedBuiltinViewModel> _shadowedBuiltins = [];
-    [ObservableProperty] private IReadOnlyList<ProblemRowViewModel> _atRisk = [];
+    [ObservableProperty] private IReadOnlyList<DashboardItemViewModel> _atRisk = [];
 
     [ObservableProperty] private string _unlistedNote = "";
 
@@ -75,7 +75,7 @@ public sealed partial class ShadowingViewModel : ScanPageViewModel
         // A writable folder ahead of System32 (SEC-04): every Windows command could be shadowed from it.
         AtRisk = result.Diagnosis.Groups
             .Where(g => g.Members.Any(f => f.Rule == "SEC-04"))
-            .Select(g => new ProblemRowViewModel(g, Navigator))
+            .Select(g => new DashboardItemViewModel(g.Primary.Title, g.Severity, g, null, g.Primary.Scope ?? PathScope.Machine, Navigator))
             .ToList();
 
         UnlistedNote = report.UnlistedFolders.Count == 0 ? ""
@@ -156,12 +156,12 @@ public sealed class ProviderRowViewModel(CommandProvider provider, bool wins)
     public string Label => wins ? "RUNS" : "hidden";
     public IBrush LabelBrush => wins ? Brush("AccentBrush") : Brush("MutedBrush");
 
-    /// <summary>"machine #3 · .EXE · Windows".</summary>
+    /// <summary>"system #3 · .EXE · Windows".</summary>
     public string Meta
     {
         get
         {
-            var parts = new List<string> { $"{Severities.ScopeWord(provider.Entry.Scope)} #{provider.Entry.Index + 1}", provider.Extension };
+            var parts = new List<string> { $"{EntryWords.ScopeName(provider.Entry.Scope)} #{provider.Entry.Index + 1}", provider.Extension };
             if (provider.IsWindows) parts.Add("Windows");
             return string.Join(" · ", parts);
         }

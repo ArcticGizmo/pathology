@@ -7,6 +7,7 @@ using Pathology.App.ViewModels;
 using Pathology.App.Views;
 using Pathology.Core.Capture;
 using Pathology.Core.Changelog;
+using Pathology.Core.Model;
 using Pathology.Core.Remediation;
 
 namespace Pathology.App.Rendering;
@@ -44,7 +45,7 @@ internal static class HeadlessRenderer
                 var vm = Shell(services, messy);
                 // Pose each page with something worth looking at selected, the way a user would leave it.
                 vm.Shadowing.Show("python");
-                vm.Entries.Select(Core.Model.PathScope.Machine, 0);
+                vm.SystemEntries.Select(PathScope.Machine, 0);
                 vm.Learn.Open(Core.Detection.LearnTopics.ValueKinds);
                 foreach (var page in vm.Pages)
                 {
@@ -52,7 +53,7 @@ internal static class HeadlessRenderer
                     Capture(vm, Path.Combine(outDir, $"main_{page.Title.ToLowerInvariant()}.png"));
                 }
 
-                RenderHealthStates(outDir, services);
+                RenderDashboardStates(outDir, services);
                 RenderSelections(outDir, services, messy);
                 RenderRepair(outDir, services, messy);
                 RenderChangelog(outDir);
@@ -86,26 +87,26 @@ internal static class HeadlessRenderer
         new(services, PosedSession(result), new PosedRepair(PosedRepair.PosedHistory()), checkForUpdates: false);
 
     /// <summary>
-    /// Health when everything is clean, part-way through a scan, and before any scan; then the worst case and an
-    /// empty PATH on every diagnostic page.
+    /// The Dashboard when everything is clean, part-way through a scan, and before any scan; then the worst case and
+    /// an empty PATH on every page drawn from the scan.
     /// </summary>
-    static void RenderHealthStates(string outDir, AppServices services)
+    static void RenderDashboardStates(string outDir, AppServices services)
     {
-        Capture(Shell(services, ScanResult.Of(PosedMachines.Clean())), Path.Combine(outDir, "health_clean.png"));
+        Capture(Shell(services, ScanResult.Of(PosedMachines.Clean())), Path.Combine(outDir, "dashboard_clean.png"));
 
         // Part-way through: the checklist is posed from a progress report; nothing runs.
         var scanning = Shell(services, null);
         scanning.Session.IsScanning = true;
         scanning.Session.Progress.Apply(new CaptureProgress(CaptureStep.ProbingDirectories, 17, 41));
-        Capture(scanning, Path.Combine(outDir, "health_scanning.png"));
+        Capture(scanning, Path.Combine(outDir, "dashboard_scanning.png"));
 
-        Capture(Shell(services, null), Path.Combine(outDir, "health_idle.png"));
+        Capture(Shell(services, null), Path.Combine(outDir, "dashboard_idle.png"));
 
         // The worst case and the empty one, across the pages where they look different.
         foreach (var (name, snapshot) in new[] { ("worst", PosedMachines.Worst()), ("empty", PosedMachines.Empty()) })
         {
             var vm = Shell(services, ScanResult.Of(snapshot));
-            foreach (var page in new PageViewModel[] { vm.Health, vm.Findings, vm.Entries, vm.Shadowing })
+            foreach (var page in new PageViewModel[] { vm.Dashboard, vm.SystemEntries, vm.UserEntries, vm.Shadowing })
             {
                 vm.CurrentPage = page;
                 Capture(vm, Path.Combine(outDir, $"{page.Title.ToLowerInvariant()}_{name}.png"));
@@ -113,20 +114,23 @@ internal static class HeadlessRenderer
         }
     }
 
-    /// <summary>Other selections worth eyeballing: notes, a hygiene entry, a shadowed built-in, a long article.</summary>
+    /// <summary>Other selections worth eyeballing: a problem unfolded, a hygiene entry, a shadowed built-in, a long article.</summary>
     static void RenderSelections(string outDir, AppServices services, ScanResult result)
     {
         var vm = Shell(services, result);
 
-        vm.ToFindings(new FindingsQuery(NotesOnly: true));
-        Capture(vm, Path.Combine(outDir, "findings_notes.png"));
+        // A problem with no fix, unfolded to say what to do (a pose: it only toggles a flag).
+        if (vm.Dashboard.WorthKnowing.FirstOrDefault() is { } item) item.IsExpanded = true;
+        Capture(vm, Path.Combine(outDir, "dashboard_unfolded.png"), height: 1300);
 
+        vm.ToEntry(PathScope.User, 2);
+        Capture(vm, Path.Combine(outDir, "user_quotes.png"));
+
+        // A missing folder: a phantom-directory risk as well as dead.
         var phantom = result.Diagnosis.Groups.First(g => g.Members.Any(f => f.Rule == "SEC-03"));
-        vm.ToFindings(new FindingsQuery(RootCause: phantom.RootCause));
-        Capture(vm, Path.Combine(outDir, "findings_phantom.png"));
-
-        vm.ToEntry(Core.Model.PathScope.User, 2);
-        Capture(vm, Path.Combine(outDir, "entries_user_quotes.png"));
+        var entry = phantom.Members.SelectMany(f => f.Entries).First();
+        vm.ToEntry(entry.Scope, entry.Index);
+        Capture(vm, Path.Combine(outDir, "system_phantom.png"));
 
         vm.ToCommand("where");
         Capture(vm, Path.Combine(outDir, "shadowing_where.png"));
@@ -136,49 +140,53 @@ internal static class HeadlessRenderer
     }
 
     /// <summary>
-    /// Fix and History in the states worth checking: a reorder that changes which command runs, hand edits, the
-    /// confirm step, a finished apply, an empty history and an undo being confirmed. Every state is posed on the
-    /// view-models; the repair service would throw if anything tried to apply.
+    /// Staging, Review and History in the states worth checking: the recommended fixes staged, hand edits, a move to
+    /// the user PATH, a reorder that changes which command runs, the confirm step, a finished apply, an empty history
+    /// and an undo being confirmed. Every state is posed on the view-models; the repair service would throw if
+    /// anything tried to apply.
     /// </summary>
     static void RenderRepair(string outDir, AppServices services, ScanResult result)
     {
-        var vm = Shell(services, result);
-        vm.CurrentPage = vm.Fix;
+        var staged = Shell(services, result);
+        staged.Pending.StageRecommended();
+        staged.ToEntry(PathScope.Machine, 0);
+        Capture(staged, Path.Combine(outDir, "system_staged.png"));
+        staged.ToReview();
+        Capture(staged, Path.Combine(outDir, "review_staged.png"), height: 2000);
+        staged.Review.IsConfirming = true;
+        Capture(staged, Path.Combine(outDir, "review_confirm.png"), height: 2000);
 
-        vm.Fix.Fixes.Single(f => f.Fix.Id == RemediationPlanner.WindowsFirstId).IsSelected = true;
-        Capture(vm, Path.Combine(outDir, "fix_windows_first.png"));
+        var order = Shell(services, result);
+        order.Pending.Fixes.Single(f => f.Fix.Id == RemediationPlanner.WindowsFirstId).IsStaged = true;
+        order.ToReview();
+        Capture(order, Path.Combine(outDir, "review_windows_first.png"), height: 1400);
 
-        vm.Fix.Sections[1].LiveRows[^1].RemoveCommand.Execute(null);
-        vm.Fix.Sections[1].LiveRows[1].MoveUpCommand.Execute(null);
-        vm.Fix.Sections[0].LiveRows[^1].MoveScopeCommand.Execute(null);
-        vm.Fix.NewEntryText = @"C:\Users\you\AppData\Local\Programs\tool\bin";
-        vm.Fix.AddCommand.Execute(null);
-        // Picked out, so its buttons show, and being edited.
-        vm.Fix.Sections[1].LiveRows[0].SelectCommand.Execute(null);
-        vm.Fix.Sections[1].LiveRows[0].BeginEditCommand.Execute(null);
-        // Tall, so the editor below the fixes is in the picture too.
-        Capture(vm, Path.Combine(outDir, "fix_edited.png"), height: 2300);
+        // Hand edits: one deleted, one moved up, one moved over from the system PATH, one being edited.
+        var edited = Shell(services, result);
+        var user = edited.UserEntries;
+        user.Rows.Last(r => !r.IsGhost).DeleteCommand.Execute(null);
+        user.Rows.Where(r => !r.IsGhost).ElementAt(1).MoveUpCommand.Execute(null);
+        edited.SystemEntries.Rows.Last(r => !r.IsGhost).MoveScopeCommand.Execute(null);
+        edited.CurrentPage = user;
+        user.Rows.First(r => !r.IsGhost).BeginEditCommand.Execute(null);
+        Capture(edited, Path.Combine(outDir, "user_edited.png"));
 
-        var confirm = Shell(services, result);
-        confirm.CurrentPage = confirm.Fix;
-        confirm.Fix.IsConfirming = true;
-        Capture(confirm, Path.Combine(outDir, "fix_confirm.png"));
-
-        // "Move to your user PATH" from Entries, on its own: the user PATH gets the copy first.
+        // "Move to your user PATH" on its own: the user PATH gets the copy first.
         var move = Shell(services, result);
-        foreach (var fix in move.Fix.Fixes) fix.IsSelected = false;
-        move.Entries.Select(Core.Model.PathScope.Machine, 0);
-        move.Entries.Detail!.MoveToUserCommand.Execute(null);
-        Capture(move, Path.Combine(outDir, "fix_move_to_user.png"), height: 1600);
+        move.ToEntry(PathScope.Machine, 0);
+        move.SystemEntries.Selected!.MoveScopeCommand.Execute(null);
+        Capture(move, Path.Combine(outDir, "system_move_to_user.png"));
+        move.ToReview();
+        Capture(move, Path.Combine(outDir, "review_move_to_user.png"));
 
         var done = Shell(services, result);
-        done.CurrentPage = done.Fix;
-        done.Fix.PoseOutcome(PosedRepair.PosedHistory()[0]);
-        Capture(done, Path.Combine(outDir, "fix_applied.png"));
+        done.ToReview();
+        done.Review.PoseOutcome(PosedRepair.PosedHistory()[0]);
+        Capture(done, Path.Combine(outDir, "review_applied.png"));
 
         var clean = Shell(services, ScanResult.Of(PosedMachines.Clean()));
-        clean.CurrentPage = clean.Fix;
-        Capture(clean, Path.Combine(outDir, "fix_clean.png"));
+        clean.CurrentPage = clean.SystemEntries;
+        Capture(clean, Path.Combine(outDir, "system_clean.png"));
 
         var history = Shell(services, result);
         history.CurrentPage = history.History;

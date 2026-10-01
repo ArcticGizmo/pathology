@@ -44,7 +44,7 @@ internal sealed class RecordingRepair : IRepairService
     }
 }
 
-public class FixViewModelTests
+public class ReviewViewModelTests
 {
     /// <summary>A session over the messy PC whose "scan" hands back the same snapshot: nothing real is scanned.</summary>
     static ScanSession Session()
@@ -55,234 +55,141 @@ public class FixViewModelTests
         return session;
     }
 
-    static FixViewModel Page(out RecordingRepair repair, ScanSession? session = null)
+    static ReviewViewModel Page(out EntryPages pages, out RecordingNavigator nav)
     {
-        repair = new RecordingRepair();
-        return new FixViewModel(session ?? Session(), new RecordingNavigator(), repair);
+        pages = new EntryPages(Session());
+        nav = pages.Navigator;
+        return new ReviewViewModel(pages.Pending, nav);
     }
 
     [Fact]
-    public void The_recommended_fixes_start_ticked_and_show_what_they_change()
+    public void Nothing_staged_has_nothing_to_apply()
     {
-        var page = Page(out _);
+        var page = Page(out _, out _);
 
-        Assert.Equal(page.Fixes.Select(f => f.Fix.Recommended), page.Fixes.Select(f => f.IsSelected));
-        Assert.False(page.Changes.IsEmpty);
+        Assert.Equal("Nothing is staged.", page.Summary);
+        Assert.False(page.Plan!.HasChanges);
+        Assert.False(page.ApplyCommand.CanExecute(null));
+        Assert.False(page.DiscardCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void The_recommended_fixes_staged_show_what_they_change()
+    {
+        var page = Page(out var pages, out _);
+
+        pages.Pending.StageRecommended();
+
+        Assert.Equal(pages.Pending.Fixes.Count(f => f.Fix.Recommended), page.Staged.Count);
         Assert.True(page.Plan!.HasChanges);
         Assert.Contains(page.Plan.Ratings, r => r.Changes);
         Assert.True(page.ApplyCommand.CanExecute(null));
+        Assert.False(page.HasEdits);
     }
 
     [Fact]
-    public void Nothing_ticked_and_nothing_edited_has_nothing_to_apply()
+    public void Unstaging_a_fix_here_unstages_it_on_its_entry()
     {
-        var page = Page(out _);
-        foreach (var fix in page.Fixes) fix.IsSelected = false;
+        var page = Page(out var pages, out _);
+        pages.Pending.StageRecommended();
+        var tools = page.Staged.Single(f => f.Title == @"Lock down C:\Tools");
 
-        Assert.True(page.Changes.IsEmpty);
-        Assert.False(page.Plan!.HasChanges);
-        Assert.False(page.ApplyCommand.CanExecute(null));
+        tools.ToggleCommand.Execute(null);
+
+        Assert.DoesNotContain(page.Staged, f => f.Title == @"Lock down C:\Tools");
+        Assert.DoesNotContain(EntryPages.Line(pages.System, @"C:\Tools").Fixes, f => f.IsStaged);
     }
 
     [Fact]
-    public void A_choice_survives_a_rescan()
+    public void Your_own_edits_are_counted_with_the_fixes()
     {
-        var session = Session();
-        var page = Page(out _, session);
-        var first = page.Fixes.First(f => f.IsSelected);
-        first.IsSelected = false;
+        var page = Page(out var pages, out _);
+        EntryPages.Line(pages.System, @"C:\OldApp\bin").DeleteCommand.Execute(null);
+        EntryPages.Line(pages.System, @"C:\Tools").Fixes.First().ToggleCommand.Execute(null);
 
-        session.Show(ScanResult.Of(PosedMachines.Messy()));
-
-        Assert.False(page.Fixes.Single(f => f.Fix.Id == first.Fix.Id).IsSelected);
-    }
-
-    [Fact]
-    public void Editor_buttons_shape_the_change_set()
-    {
-        var page = Page(out _);
-        foreach (var fix in page.Fixes) fix.IsSelected = false;
-
-        var machine = page.Sections[0];
-        var tools = machine.Rows.Single(r => r.Entry.Text == @"C:\Tools");
-        tools.MoveScopeCommand.Execute(null);
-        page.NewEntryText = @"C:\Users\you\new\bin";
-        page.AddCommand.Execute(null);
-
-        var user = page.Changes.ValueFor(PathScope.User)!.After.Value!;
-        Assert.StartsWith(@"C:\Tools;", user);
-        Assert.EndsWith(@";C:\Users\you\new\bin", user.TrimEnd(';'));
-        Assert.DoesNotContain(@"C:\Tools;", page.Changes.ValueFor(PathScope.Machine)!.After.Value!);
-        Assert.True(page.HasEdits);
-
-        page.ResetEditsCommand.Execute(null);
-        Assert.True(page.Changes.IsEmpty);
-    }
-
-    [Fact]
-    public void Moving_an_entry_your_user_PATH_already_has_removes_the_machine_copy()
-    {
-        var page = Page(out _);
-        foreach (var fix in page.Fixes) fix.IsSelected = false;
-        page.NewEntryText = @"c:\tools\";
-        page.AddCommand.Execute(null);
-        var index = page.Result!.Snapshot.EntriesIn(PathScope.Machine).Single(e => e.Raw == @"C:\Tools").Index;
-
-        page.StageMoveToUser(index);
-
-        Assert.DoesNotContain(@"C:\Tools;", page.Changes.ValueFor(PathScope.Machine)!.After.Value!);
-        Assert.Single(page.Sections[1].Rows, r => r.Entry.Text.Equals(@"c:\tools\", StringComparison.Ordinal));
-        Assert.DoesNotContain(page.Sections[1].Rows, r => r.Entry.Text == @"C:\Tools");
-    }
-
-    [Fact]
-    public void Each_fix_shows_on_the_lines_it_changes_and_value_fixes_on_the_heading()
-    {
-        var page = Page(out _);
-        var machine = page.Sections[0];
-
-        var tools = machine.LiveRows.Single(r => r.Entry.Text == @"C:\Tools");
-        Assert.Contains(tools.Fixes, t => t.Title == @"Lock down C:\Tools");
-        Assert.Contains(machine.ValueFixes, t => t.Fix.Fix.Id == RemediationPlanner.WindowsFirstId);
-        Assert.DoesNotContain(machine.Rows.SelectMany(r => r.Fixes), t => t.Fix.Fix.Id == RemediationPlanner.WindowsFirstId);
-
-        // A lock-down of two folders shows on both lines, says so, and is one tick.
-        var python = machine.LiveRows.Where(r => r.Entry.Text.StartsWith(@"C:\Python312", StringComparison.Ordinal)).ToList();
-        var shared = python[0].Fixes.Single(t => t.Title.Contains("inherit", StringComparison.Ordinal));
-        Assert.Same(shared.Fix, python[1].Fixes.Single(t => t.Title.Contains("inherit", StringComparison.Ordinal)).Fix);
-        Assert.Contains("2 lines", shared.Meta);
-
-        // Every fix shows somewhere.
-        var shown = page.Sections.SelectMany(s => s.Rows.SelectMany(r => r.Fixes).Concat(s.ValueFixes)).Select(t => t.Fix).ToHashSet();
-        Assert.All(page.Fixes, f => Assert.Contains(f, shown));
-    }
-
-    [Fact]
-    public void A_line_a_fix_removes_stays_struck_through_with_its_tick()
-    {
-        var page = Page(out _);
-        var gone = page.Sections[0].Rows.Single(r => r.Entry.Text == @"C:\OldApp\bin");
-        Assert.True(gone.IsGhost);
-        Assert.Equal("removed", gone.Status);
-        Assert.False(gone.CanPutBack);
-
-        gone.Fixes.Single().Fix.IsSelected = false;
-
-        var back = page.Sections[0].Rows.Single(r => r.Entry.Text == @"C:\OldApp\bin");
-        Assert.False(back.IsGhost);
-        Assert.Contains(back.Fixes, t => !t.Fix.IsSelected);
-    }
-
-    [Fact]
-    public void A_line_you_removed_can_be_put_back_and_only_the_picked_line_shows_its_buttons()
-    {
-        var page = Page(out _);
-        foreach (var fix in page.Fixes) fix.IsSelected = false;
-        var git = page.Sections[0].LiveRows.First(r => r.Entry.Text == @"C:\Program Files\Git\cmd");
-        Assert.False(git.ShowTools);
-
-        git.SelectCommand.Execute(null);
-        Assert.True(git.ShowTools);
-        Assert.Single(page.Sections.SelectMany(s => s.Rows), r => r.ShowTools);
-
-        git.RemoveCommand.Execute(null);
-        var gone = page.Sections[0].Rows.First(r => r.IsGhost);
-        Assert.True(gone.CanPutBack);
-        Assert.False(gone.ShowTools);
-        gone.PutBackCommand.Execute(null);
-
-        Assert.True(page.Changes.IsEmpty);
-        Assert.DoesNotContain(page.Sections[0].Rows, r => r.IsGhost);
-    }
-
-    [Fact]
-    public void A_line_shows_what_it_expands_to_when_that_differs()
-    {
-        var page = Page(out _);
-        var user = page.Sections[1].LiveRows;
-
-        Assert.Equal(@"C:\Users\you\AppData\Local\Microsoft\WindowsApps",
-            user.Single(r => r.Entry.Text.StartsWith("%USERPROFILE%", StringComparison.Ordinal)).Expanded);
-        Assert.False(user.Single(r => r.Entry.Text == @"C:\Users\you\.dotnet\tools").HasExpanded);
-    }
-
-    [Fact]
-    public void Removing_and_editing_an_entry_land_in_the_value()
-    {
-        var page = Page(out _);
-        foreach (var fix in page.Fixes) fix.IsSelected = false;
-
-        page.Sections[0].Rows.Single(r => r.Entry.Text == @"C:\OldApp\bin").RemoveCommand.Execute(null);
-        var git = page.Sections[0].Rows.First(r => r.Entry.Text == @"C:\Program Files\Git\cmd");
-        git.BeginEditCommand.Execute(null);
-        git.EditText = @"C:\Program Files\Git\bin";
-        git.SaveEditCommand.Execute(null);
-
-        var machine = page.Changes.ValueFor(PathScope.Machine)!.After.Value!;
-        Assert.DoesNotContain(@"C:\OldApp\bin", machine);
-        Assert.Contains(@"C:\Program Files\Git\bin", machine);
-        Assert.Contains(page.Plan!.Values.Single().Lines, l => l.Marker == "−" && l.Text == @"C:\OldApp\bin");
+        Assert.Equal("1 fix and 1 edit staged.", page.Summary);
+        Assert.StartsWith("Plus 1 edit", page.EditsLine);
     }
 
     [Fact]
     public async Task Apply_asks_first_then_applies_exactly_what_is_shown_once()
     {
-        var page = Page(out var repair);
-        var shown = page.Changes;
+        var page = Page(out var pages, out _);
+        pages.Pending.StageRecommended();
+        var shown = pages.Pending.Changes;
+        var staged = page.Staged.Count;
 
         page.ApplyCommand.Execute(null);
         Assert.True(page.IsConfirming);
-        Assert.Empty(repair.Applied);
+        Assert.Empty(pages.Repair.Applied);
 
         page.CancelApplyCommand.Execute(null);
         Assert.False(page.IsConfirming);
-        Assert.Empty(repair.Applied);
+        Assert.Empty(pages.Repair.Applied);
 
         page.ApplyCommand.Execute(null);
         await page.ConfirmCommand.ExecuteAsync(null);
 
-        var (changes, summary, fixes, undoOf) = Assert.Single(repair.Applied);
+        var (changes, summary, fixes, undoOf) = Assert.Single(pages.Repair.Applied);
         Assert.Same(shown, changes);
         Assert.Null(undoOf);
-        Assert.Equal(page.Fixes.Count(f => f.IsSelected), fixes.Count);
+        Assert.Equal(staged, fixes.Count);
         Assert.EndsWith("fixes", summary);
         Assert.False(page.IsConfirming);
         Assert.False(page.ApplyFailed);
         Assert.StartsWith("Done.", page.ApplyStatus);
+        // What was staged is written: the re-scan starts again with nothing staged.
+        Assert.False(pages.Pending.HasStaged);
     }
 
     [Fact]
     public async Task A_declined_prompt_is_reported_and_not_called_a_success()
     {
-        var page = Page(out var repair);
-        repair.Outcome = ChangeOutcome.Cancelled;
+        var page = Page(out var pages, out _);
+        pages.Pending.StageRecommended();
+        pages.Repair.Outcome = ChangeOutcome.Cancelled;
 
         page.ApplyCommand.Execute(null);
         await page.ConfirmCommand.ExecuteAsync(null);
 
         Assert.True(page.ApplyFailed);
         Assert.Contains("nothing was changed", page.ApplyStatus, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void Arriving_from_an_entry_picks_it_out()
-    {
-        var page = Page(out _);
-        page.Show(PathScope.Machine, 0);
-
-        Assert.True(page.Sections.SelectMany(s => s.Rows).Single(r => r.IsHighlighted).Entry.Origin == new EntryOrigin(PathScope.Machine, 0));
+        // Nothing was written, so it's all still staged.
+        Assert.True(pages.Pending.HasStaged);
     }
 
     [Fact]
     public void Folder_lock_downs_show_their_lines_and_who_applies_them()
     {
-        var page = Page(out _);
+        var page = Page(out var pages, out _);
+        pages.Pending.StageRecommended();
 
         var tools = Assert.Single(page.Plan!.Acls, a => a.Path == @"C:\Tools");
         Assert.Equal("needs admin", tools.Badge);
         Assert.NotEmpty(tools.Lines);
         Assert.Contains("icacls", page.Plan.CommandsText);
         Assert.StartsWith("One UAC prompt", page.Plan.AdminLine);
+    }
+
+    [Fact]
+    public void Search_the_Windows_folders_first_says_which_commands_change()
+    {
+        var page = Page(out var pages, out _);
+        pages.Pending.Fixes.Single(f => f.Fix.Id == RemediationPlanner.WindowsFirstId).IsStaged = true;
+
+        Assert.True(page.Plan!.HasCommands);
+        Assert.Contains(page.Plan.Values.Single().Lines, l => l.Marker == "↕");
+    }
+
+    [Fact]
+    public void Back_goes_to_the_PATH_the_change_is_in()
+    {
+        var page = Page(out var pages, out var nav);
+        EntryPages.Line(pages.User, @"C:\Users\you\.dotnet\tools").DeleteCommand.Execute(null);
+
+        page.BackCommand.Execute(null);
+
+        Assert.Equal(PathScope.User, Assert.Single(nav.Calls));
     }
 }
 

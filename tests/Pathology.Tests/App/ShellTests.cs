@@ -3,68 +3,80 @@ using Pathology.App.Rendering;
 using Pathology.App.ViewModels;
 using Pathology.Core.Detection;
 using Pathology.Core.Model;
+using Pathology.Core.Remediation;
 
 namespace Pathology.Tests.App;
 
 public class ShellTests
 {
+    static MainWindowViewModel Shell(AppServices services) =>
+        new(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
+
     [Fact]
-    public void The_nav_badges_count_high_problems_and_entries()
+    public void The_nav_is_the_dashboard_the_two_PATHs_under_Entries_shadowing_and_history()
     {
         using var store = new TempStore();
         using var services = new AppServices(store.Root);
-        var session = Sessions.Showing(PosedMachines.Messy());
+        var vm = Shell(services);
 
-        var vm = new MainWindowViewModel(services, session, new PosedRepair(), checkForUpdates: false);
-
-        Assert.Equal(session.Current!.Health.Count(Severity.High), vm.Findings.NavCount);
-        Assert.True(vm.Findings.NavCount > 0);
-        Assert.Equal(session.Current.Snapshot.Entries.Count, vm.Entries.NavCount);
+        var labels = vm.NavItems.Select(i => i is NavGroupViewModel g ? "+" + g.Label : ((PageViewModel)i).Title).ToList();
+        Assert.Equal(["Dashboard", "+Entries", "System", "User", "Shadowing", "History"], labels);
+        Assert.Same(vm.Dashboard, vm.CurrentPage);
+        // Learn is a bonus: it sits with Settings and About, and Review is reached from the pending bar.
+        Assert.DoesNotContain(vm.Learn, vm.NavItems);
+        Assert.DoesNotContain(vm.Review, vm.NavItems);
+        Assert.Contains(vm.Review, vm.Pages);
     }
 
     [Fact]
-    public void Fix_and_History_sit_in_their_own_Repair_section()
+    public void The_entries_badges_count_entries_with_a_problem()
     {
         using var store = new TempStore();
         using var services = new AppServices(store.Root);
-        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
+        var vm = Shell(services);
+        var result = vm.Session.Current!;
 
-        var labels = vm.NavItems.Select(i => i is NavHeaderViewModel h ? "#" + h.Label : ((PageViewModel)i).Title).ToList();
-        Assert.Equal(["#Diagnose", "Health", "Findings", "Entries", "Shadowing", "#Repair", "Fix", "History", "#Understand", "Learn"], labels);
-        Assert.True(vm.Fix.NavCount > 0);
-
-        vm.Entries.Select(PathScope.Machine, 0);
-        vm.Entries.Detail!.ChangeInFixCommand.Execute(null);
-        Assert.Same(vm.Fix, vm.CurrentPage);
-        Assert.Contains(vm.Fix.Sections.SelectMany(s => s.Rows), r => r.IsHighlighted);
+        foreach (var (page, scope) in new[] { (vm.SystemEntries, PathScope.Machine), (vm.UserEntries, PathScope.User) })
+            Assert.Equal(result.Snapshot.EntriesIn(scope).Count(e => result.GroupsFor(e).Any(g => g.Severity > Severity.Info)), page.NavCount);
     }
 
     [Fact]
-    public void Move_to_your_user_PATH_on_Entries_stages_the_move_on_Fix()
+    public void The_Entries_group_opens_System_and_reads_as_open_while_either_page_shows()
     {
         using var store = new TempStore();
         using var services = new AppServices(store.Root);
-        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
-        foreach (var fix in vm.Fix.Fixes) fix.IsSelected = false;
-        var tools = vm.Entries.Sections[0].Rows.Single(r => r.Entry.Raw == @"C:\Tools").Entry;
+        var vm = Shell(services);
+        var group = vm.NavItems.OfType<NavGroupViewModel>().Single();
+        Assert.False(group.IsActive);
 
-        vm.Entries.Select(PathScope.User, 0);
-        Assert.False(vm.Entries.Detail!.CanMoveToUser);
-        vm.Entries.Select(PathScope.Machine, tools.Index);
-        Assert.True(vm.Entries.Detail!.CanMoveToUser);
-        vm.Entries.Detail.MoveToUserCommand.Execute(null);
+        vm.OpenGroupCommand.Execute(group);
+        Assert.Same(vm.SystemEntries, vm.CurrentPage);
+        Assert.True(group.IsActive);
 
-        Assert.Same(vm.Fix, vm.CurrentPage);
-        var moved = Assert.Single(vm.Fix.Sections[1].Rows, r => r.IsHighlighted);
-        Assert.Equal(@"C:\Tools", moved.Entry.Text);
-        Assert.DoesNotContain(vm.Fix.Sections[0].LiveRows, r => r.Entry.Text == @"C:\Tools");
-        // It stays where it was in the machine PATH, struck through, saying where it went.
-        var gone = Assert.Single(vm.Fix.Sections[0].Rows, r => r.IsGhost);
-        Assert.Equal("moves to the user PATH", gone.Status);
-        Assert.True(gone.CanPutBack);
-        Assert.True(moved.IsSelected);
-        Assert.NotNull(vm.Fix.Changes.UserFirst());
-        Assert.Contains("written first", vm.Fix.Plan!.AdminLine);
+        vm.NavigateCommand.Execute(vm.UserEntries);
+        Assert.True(group.IsActive);
+
+        vm.NavigateCommand.Execute(vm.History);
+        Assert.False(group.IsActive);
+    }
+
+    [Fact]
+    public void A_move_staged_on_System_shows_on_User_and_in_Review()
+    {
+        using var store = new TempStore();
+        using var services = new AppServices(store.Root);
+        var vm = Shell(services);
+
+        vm.ToEntry(PathScope.Machine, 0);
+        vm.SystemEntries.Selected!.MoveScopeCommand.Execute(null);
+
+        Assert.Contains(vm.UserEntries.Rows, r => r.Text == @"C:\Tools" && !r.IsGhost);
+        vm.SystemEntries.ReviewCommand.Execute(null);
+        Assert.Same(vm.Review, vm.CurrentPage);
+        Assert.Contains("written first", vm.Review.Plan!.AdminLine);
+
+        vm.Review.BackCommand.Execute(null);
+        Assert.Contains(vm.CurrentPage, new PageViewModel[] { vm.SystemEntries, vm.UserEntries });
     }
 
     [Fact]
@@ -72,20 +84,23 @@ public class ShellTests
     {
         using var store = new TempStore();
         using var services = new AppServices(store.Root);
-        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
+        var vm = Shell(services);
 
         vm.ToEntry(PathScope.User, 1);
-        Assert.Same(vm.Entries, vm.CurrentPage);
-        Assert.Equal((PathScope.User, 1), (vm.Entries.Selected!.Entry.Scope, vm.Entries.Selected.Entry.Index));
+        Assert.Same(vm.UserEntries, vm.CurrentPage);
+        Assert.Equal(new EntryOrigin(PathScope.User, 1), vm.UserEntries.Selected!.Entry.Origin);
 
         vm.ToLearn(LearnTopics.PathExt);
         Assert.Same(vm.Learn, vm.CurrentPage);
         Assert.True(vm.Learn.IsActive);
-        Assert.False(vm.Entries.IsActive);
+        Assert.False(vm.UserEntries.IsActive);
 
         vm.ToCommand("git");
         Assert.Same(vm.Shadowing, vm.CurrentPage);
         Assert.Equal("git", vm.Shadowing.Query);
+
+        vm.ToEntries(PathScope.Machine);
+        Assert.Same(vm.SystemEntries, vm.CurrentPage);
     }
 
     [Fact]

@@ -22,11 +22,11 @@
         <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,16">
             <TextBlock Classes="pagetitle" Text="History" />
             <TextBlock Classes="help"
-                       Text="Every change applied from Fix, newest first. Each one keeps what it replaced, so Undo puts it back. An undo is a change too, and shows up here." />
+                       Text="An audit log of every change PATHology has made, newest first. Each one keeps what it replaced, so Undo puts it back. An undo is a change too, and shows up here." />
         </StackPanel>
 
         <TextBlock Grid.Row="1" Classes="help" IsVisible="{Binding IsEmpty}"
-                   Text="Nothing has been changed yet. Changes you apply from Fix appear here, with a way to undo each one." />
+                   Text="Nothing has been changed yet. Changes you stage on the System and User pages and apply from Review appear here, with a way to undo each one." />
 
         <Grid Grid.Row="1" ColumnDefinitions="*,1.3*" ColumnSpacing="14" IsVisible="{Binding !IsEmpty}">
 

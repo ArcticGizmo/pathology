@@ -7,28 +7,81 @@
              x:DataType="vm:EntriesViewModel">
 
     <UserControl.Styles>
-        <!-- The who-can-write matrix: one 40px column per perspective, header and cells alike. -->
-        <Style Selector="TextBlock.colhead">
-            <Setter Property="Width" Value="40" />
-            <Setter Property="FontSize" Value="9.5" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="TextAlignment" Value="Center" />
+        <!-- Common.axaml's .help/.field match TextBlock exactly; the prose here is CharWrapTextBlocks. -->
+        <Style Selector="controls|CharWrapTextBlock.help">
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         </Style>
-        <!-- What an entry expands to, under the stored text: lighter, so the stored text leads. -->
+        <Style Selector="controls|CharWrapTextBlock.field">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}" />
+        </Style>
+
+        <!-- What an entry expands to, under the stored text: lighter, so the stored text leads. A line that's
+             gone, struck through. -->
         <Style Selector=":is(TextBlock).mono.expansion">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         </Style>
+        <Style Selector=":is(TextBlock).mono.gone">
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+        </Style>
+
+        <!-- The panel's action buttons: compact and neutral. -->
+        <Style Selector="Button.tool">
+            <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.tool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ButtonNeutralHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+        </Style>
+        <Style Selector="Button.tool.danger">
+            <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+        </Style>
+
+        <!-- A fix, where it can be staged: a card with its tick on the right. -->
+        <Style Selector="Border.fix">
+            <Setter Property="Background" Value="{DynamicResource FormBgBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,9" />
+        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="32,36,32,24">
+    <UserControl.DataTemplates>
+        <!-- A fix with its stage toggle: on the whole-PATH card, under a problem, and under "other fixes". -->
+        <DataTemplate DataType="vm:FixRowViewModel">
+            <Border Classes="fix">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <controls:CharWrapTextBlock Source="{Binding Title}" Prose="True" FontSize="12.5"
+                                                    Foreground="{DynamicResource FgBrush}" />
+                        <TextBlock Text="{Binding Meta}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}"
+                                   TextWrapping="Wrap" IsVisible="{Binding HasMeta}" />
+                        <controls:CharWrapTextBlock Source="{Binding Note}" Prose="True" FontSize="11.5"
+                                                    Foreground="{DynamicResource WarnBrush}" IsVisible="{Binding HasNote}" />
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Classes="chip" VerticalAlignment="Top"
+                                  IsChecked="{Binding IsStaged}" Content="{Binding StageLabel}"
+                                  AutomationProperties.Name="{Binding Title}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="32,36,32,24">
 
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
             <StackPanel Grid.Column="0" Spacing="3">
-                <TextBlock Classes="pagetitle" Text="PATH entries" />
-                <TextBlock Classes="help"
-                           Text="The machine PATH, then yours: the order Windows searches them, as stored, with what a %VARIABLE% expands to beneath. The squares show who can add files to each folder." />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Classes="pagetitle" Text="{Binding Heading}" />
+                    <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="{Binding Help}" />
             </StackPanel>
             <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
                     Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
@@ -43,175 +96,274 @@
             </views:ScanStatusPanel.IsVisible>
         </views:ScanStatusPanel>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12" IsVisible="{Binding HasResult}">
-            <ToggleButton Classes="chip" Content="Highlight defects" IsChecked="{Binding ShowDefects}"
-                          ToolTip.Tip="Pick out quotes, stray spaces, doubled backslashes and forward slashes" />
-        </StackPanel>
+        <!-- Fixes about the value as a whole: its kind, its order, Windows' folders put back. -->
+        <Border Grid.Row="2" Classes="panel" Padding="16,12" Margin="0,0,0,14">
+            <Border.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="HasResult" />
+                    <Binding Path="HasValueFixes" />
+                </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Spacing="8">
+                <TextBlock Classes="phead" Text="{Binding ValueHeading}" />
+                <ItemsControl ItemsSource="{Binding ValueFixes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FixRowViewModel">
+                            <StackPanel Spacing="4" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                    <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top" Margin="0,5,0,0"
+                                             Fill="{Binding SeverityBrush}" />
+                                    <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding Problem}" Prose="True" Classes="field" FontSize="12.5" />
+                                </Grid>
+                                <ContentControl Content="{Binding}" Margin="16,0,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
 
-        <Grid Grid.Row="3" ColumnDefinitions="1.25*,*" ColumnSpacing="14" IsVisible="{Binding HasResult}">
+        <Grid Grid.Row="3" ColumnDefinitions="1.1*,*" ColumnSpacing="14" IsVisible="{Binding HasResult}">
 
-            <Border Grid.Column="0" Classes="panel" Padding="6" MaxWidth="760">
+            <!-- The PATH as it would be. Click a line for its problems and actions; right-click for the actions. -->
+            <Border Grid.Column="0" Classes="panel" Padding="6">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Sections}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:EntrySectionViewModel">
-                                <StackPanel Margin="0,0,0,10">
-                                    <!-- Section header, with the matrix's column labels lined up over the cells. -->
-                                    <Grid ColumnDefinitions="*,Auto,22" Margin="10,10,10,6">
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                                            <TextBlock Classes="phead" Text="{Binding Heading}" VerticalAlignment="Center" />
-                                            <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                        <ItemsControl Grid.Column="1" VerticalAlignment="Bottom" IsVisible="{Binding HasRows}"
-                                                      ItemsSource="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ColumnHeaders}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="x:String">
-                                                    <TextBlock Classes="colhead" Text="{Binding}" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
-
-                                    <ItemsControl ItemsSource="{Binding Rows}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:EntryRowViewModel">
-                                                <Button Classes="row" Classes.selected="{Binding IsSelected}"
-                                                        Command="{Binding OpenCommand}" Padding="10,6" Margin="0,1">
-                                                    <Grid ColumnDefinitions="34,*,Auto,22">
-                                                        <TextBlock Grid.Column="0" Text="{Binding Position}"
-                                                                   Classes="help" VerticalAlignment="Top" Margin="0,1,0,0" />
-                                                        <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,10,0">
-                                                            <controls:DefectTextBlock Source="{Binding Text}" Classes="mono"
-                                                                                      Highlight="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ShowDefects}" />
-                                                            <controls:DefectTextBlock Source="{Binding Expanded}" Classes="mono expansion" Highlight="False"
-                                                                                      IsVisible="{Binding HasExpanded}"
-                                                                                      ToolTip.Tip="What it expands to" />
-                                                            <TextBlock Text="{Binding Status}" FontSize="10.5"
-                                                                       Foreground="{Binding StatusBrush}"
-                                                                       IsVisible="{Binding HasStatus}" />
-                                                        </StackPanel>
-                                                        <ItemsControl Grid.Column="2" ItemsSource="{Binding Matrix}"
-                                                                      VerticalAlignment="Top" Margin="0,2,0,0">
-                                                            <ItemsControl.ItemsPanel>
-                                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                                            </ItemsControl.ItemsPanel>
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate x:DataType="vm:MatrixCellViewModel">
-                                                                    <Panel Width="40" Height="14" Background="Transparent"
-                                                                           ToolTip.Tip="{Binding Tip}">
-                                                                        <Border Width="12" Height="12" CornerRadius="3"
-                                                                                BorderThickness="1.5"
-                                                                                Background="{Binding Fill}"
-                                                                                BorderBrush="{Binding Stroke}" />
-                                                                        <TextBlock Text="{Binding Dash}" FontSize="11"
-                                                                                   HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Foreground="{DynamicResource MutedBrush}" />
-                                                                    </Panel>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                        <Ellipse Grid.Column="3" Width="8" Height="8" HorizontalAlignment="Right"
-                                                                 VerticalAlignment="Top" Margin="0,5,0,0"
-                                                                 Fill="{Binding FindingBrush}" />
-                                                    </Grid>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <StackPanel>
+                        <TextBlock Classes="help" Margin="12,10" Text="Empty." IsVisible="{Binding !HasRows}" />
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:EntryRowViewModel">
+                                    <StackPanel>
+                                        <Button Classes="row" Classes.selected="{Binding IsSelected}" IsVisible="{Binding !IsEditing}"
+                                                Command="{Binding OpenCommand}" Padding="10,6" Margin="0,1">
+                                            <Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Stage its fixes" Command="{Binding StageFixesCommand}" />
+                                                    <Separator />
+                                                    <MenuItem Header="Search it earlier" Command="{Binding MoveUpCommand}" />
+                                                    <MenuItem Header="Search it later" Command="{Binding MoveDownCommand}" />
+                                                    <MenuItem Header="{Binding MoveLabel}" Command="{Binding MoveScopeCommand}" />
+                                                    <MenuItem Header="Edit…" Command="{Binding BeginEditCommand}" />
+                                                    <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                                                    <Separator />
+                                                    <MenuItem Header="Undo my changes to it" Command="{Binding RevertCommand}" />
+                                                    <MenuItem Header="Put it back" Command="{Binding PutBackCommand}" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                            <Grid ColumnDefinitions="34,*,16">
+                                                <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="help"
+                                                           VerticalAlignment="Top" Margin="0,1,0,0" />
+                                                <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,8,0">
+                                                    <controls:DefectTextBlock Source="{Binding Text}" Classes="mono"
+                                                                              Classes.gone="{Binding IsGhost}" Highlight="{Binding !IsGhost}" />
+                                                    <controls:DefectTextBlock Source="{Binding Expanded}" Classes="mono expansion" Highlight="False"
+                                                                              IsVisible="{Binding HasExpanded}" ToolTip.Tip="What it expands to" />
+                                                    <TextBlock Text="{Binding Status}" FontSize="10.5" Foreground="{Binding StatusBrush}"
+                                                               IsVisible="{Binding HasStatus}" />
+                                                    <TextBlock Text="{Binding Change}" FontSize="10.5" TextWrapping="Wrap"
+                                                               Foreground="{Binding ChangeBrush}" IsVisible="{Binding HasChange}" />
+                                                </StackPanel>
+                                                <Ellipse Grid.Column="2" Width="8" Height="8" HorizontalAlignment="Right"
+                                                         VerticalAlignment="Top" Margin="0,5,0,0" Fill="{Binding ProblemBrush}" />
+                                            </Grid>
+                                        </Button>
+                                        <!-- Editing the text in place: Enter keeps it, Escape doesn't. -->
+                                        <Grid ColumnDefinitions="34,*" Margin="10,4" IsVisible="{Binding IsEditing}">
+                                            <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="help" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{Binding EditText}"
+                                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                                                     AutomationProperties.Name="Entry text">
+                                                <TextBox.KeyBindings>
+                                                    <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+                                                    <KeyBinding Gesture="Escape" Command="{Binding CancelEditCommand}" />
+                                                </TextBox.KeyBindings>
+                                            </TextBox>
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </ScrollViewer>
             </Border>
 
+            <!-- The picked-out line: what's wrong, what can be done, and what's there. -->
             <Border Grid.Column="1" Classes="panel" Padding="0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Panel>
-                    <TextBlock Classes="help" Margin="22,20" IsVisible="{Binding !HasSelection}"
-                               Text="Neither PATH has any entries, so there's nothing here to look at." />
-                    <StackPanel DataContext="{Binding Detail}" x:DataType="vm:EntryDetailViewModel"
-                                Margin="22,20" Spacing="16"
-                                IsVisible="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).HasSelection}">
+                        <TextBlock Classes="help" Margin="22,20" IsVisible="{Binding !HasSelection}"
+                                   Text="This PATH has no entries, so there's nothing here to look at." />
+                        <StackPanel DataContext="{Binding Panel}" x:DataType="vm:EntryPanelViewModel"
+                                    Margin="22,20" Spacing="16"
+                                    IsVisible="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).HasSelection}">
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="phead" Text="{Binding Heading}" />
-                            <controls:CharWrapTextBlock Source="{Binding Raw}" Classes="mono" FontSize="13.5" />
-                            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding StatusBrush}" />
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <Button Classes="link" FontSize="12" Content="Change it on Fix"
-                                        Command="{Binding ChangeInFixCommand}" />
-                                <Button Classes="link" FontSize="12" Content="Move to your user PATH"
-                                        Command="{Binding MoveToUserCommand}" IsVisible="{Binding CanMoveToUser}"
-                                        ToolTip.Tip="Sets the move up on Fix to review and apply. Your user PATH gets a copy first, then it's taken out of the machine PATH (one UAC prompt)." />
+                            <StackPanel Spacing="5">
+                                <TextBlock Classes="phead" Text="{Binding Heading}" />
+                                <controls:CharWrapTextBlock Source="{Binding Row.Text}" Classes="mono" FontSize="13.5" />
+                                <controls:CharWrapTextBlock Source="{Binding Row.Expanded}" Classes="mono expansion"
+                                                            IsVisible="{Binding Row.HasExpanded}" />
+                                <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding Row.StatusBrush}"
+                                           IsVisible="{Binding HasStatus}" />
+                                <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Row.HasChange}">
+                                    <TextBlock Text="{Binding Row.StagedLine}" FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{Binding Row.ChangeBrush}" />
+                                    <Button Classes="link" FontSize="12" Content="Put it back"
+                                            Command="{Binding Row.PutBackCommand}" IsVisible="{Binding Row.CanPutBack}" />
+                                    <Button Classes="link" FontSize="12" Content="Undo my changes"
+                                            Command="{Binding Row.RevertCommand}" IsVisible="{Binding Row.CanRevert}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Its problems, each with the fix to stage or what to do by hand. -->
+                            <StackPanel Spacing="10" IsVisible="{Binding HasIssues}">
+                                <TextBlock Classes="phead" Text="PROBLEMS" />
+                                <ItemsControl ItemsSource="{Binding Issues}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:IssueViewModel">
+                                            <StackPanel Spacing="6" Margin="0,0,0,14">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                                    <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
+                                                             Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="13" TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource FgBrush}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding SeverityWord}" FontSize="10" FontWeight="SemiBold"
+                                                               LetterSpacing="1" Foreground="{Binding SeverityBrush}" Margin="0,2,0,0" />
+                                                </Grid>
+                                                <StackPanel Spacing="6" Margin="18,0,0,0">
+                                                    <controls:CharWrapTextBlock Source="{Binding Why}" Prose="True" Classes="help" />
+                                                    <ItemsControl ItemsSource="{Binding Fixes}" IsVisible="{Binding HasFixes}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <controls:CharWrapTextBlock Source="{Binding Advice}" Prose="True" FontSize="12.5"
+                                                                                Foreground="{DynamicResource FgBrush}" IsVisible="{Binding HasAdvice}" />
+                                                    <Button Classes="link" FontSize="12" HorizontalAlignment="Left" Content="{Binding LearnLabel}"
+                                                            Command="{Binding OpenLearnCommand}" IsVisible="{Binding HasLearn}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <TextBlock Text="{Binding NoProblemsLine}" Classes="help" IsVisible="{Binding HasNoProblemsLine}" />
+
+                            <StackPanel Spacing="8" IsVisible="{Binding HasOtherFixes}">
+                                <TextBlock Classes="phead" Text="ALSO CHANGED BY" />
+                                <ItemsControl ItemsSource="{Binding OtherFixes}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- What you can do yourself. All staged, like the fixes. -->
+                            <StackPanel Spacing="8" IsVisible="{Binding !Row.IsGhost}">
+                                <TextBlock Classes="phead" Text="ACTIONS" />
+                                <WrapPanel ItemSpacing="6" LineSpacing="6">
+                                    <Button Classes="tool" Content="↑ Earlier" ToolTip.Tip="Search it earlier" Command="{Binding Row.MoveUpCommand}" />
+                                    <Button Classes="tool" Content="↓ Later" ToolTip.Tip="Search it later" Command="{Binding Row.MoveDownCommand}" />
+                                    <Button Classes="tool" Content="{Binding Row.MoveLabel}" ToolTip.Tip="{Binding Row.MoveTip}"
+                                            Command="{Binding Row.MoveScopeCommand}" />
+                                    <Button Classes="tool" Content="Edit" Command="{Binding Row.BeginEditCommand}" />
+                                    <Button Classes="tool danger" Content="Delete" ToolTip.Tip="Take it out of the PATH"
+                                            Command="{Binding Row.DeleteCommand}" />
+                                </WrapPanel>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6" IsVisible="{Binding HasNotes}">
+                                <TextBlock Classes="phead" Text="NOTES" />
+                                <ItemsControl ItemsSource="{Binding Notes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:IssueViewModel">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,2">
+                                                <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Top"
+                                                         Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12" TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource MutedBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Everything the scan captured, folded away. -->
+                            <StackPanel Spacing="12">
+                                <ToggleButton Classes="disclosure" HorizontalAlignment="Left"
+                                              IsChecked="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ShowDetails}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Classes="chevron" Text="▸" FontSize="12" VerticalAlignment="Center" />
+                                        <TextBlock Text="What's there, and who can write to it" FontSize="12" />
+                                    </StackPanel>
+                                </ToggleButton>
+                                <StackPanel Spacing="14" IsVisible="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ShowDetails}">
+                                    <ItemsControl ItemsSource="{Binding Facts}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:InfoRowViewModel">
+                                                <Grid ColumnDefinitions="130,*" Margin="0,2">
+                                                    <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="help" />
+                                                    <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding Value}" Prose="True"
+                                                                                Classes="field" FontSize="12.5" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="phead" Text="WHO CAN WRITE TO IT" />
+                                        <TextBlock Classes="help" Text="{Binding AccessNote}" IsVisible="{Binding HasAccessNote}" />
+                                        <ItemsControl ItemsSource="{Binding Access}" IsVisible="{Binding HasAccess}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:AccessRowViewModel">
+                                                    <Grid ColumnDefinitions="130,*" Margin="0,3">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Who}" Classes="help" />
+                                                        <StackPanel Grid.Column="1" Spacing="1">
+                                                            <TextBlock Text="{Binding Can}" FontSize="12.5" Foreground="{Binding Brush}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding Through, StringFormat='through {0}'}" Classes="help"
+                                                                       IsVisible="{Binding HasThrough}" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
-
-                        <StackPanel Spacing="4" IsVisible="{Binding ExpandedDiffers}">
-                            <TextBlock Classes="phead" Text="EXPANDS TO" />
-                            <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="phead" Text="WHAT'S THERE" />
-                            <ItemsControl ItemsSource="{Binding Facts}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:InfoRowViewModel">
-                                        <Grid ColumnDefinitions="130,*" Margin="0,2">
-                                            <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="help" />
-                                            <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding Value}" Prose="True"
-                                                                        Classes="field" FontSize="12.5" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="phead" Text="WHO CAN WRITE TO IT" />
-                            <TextBlock Classes="help" Text="{Binding AccessNote}" IsVisible="{Binding HasAccessNote}" />
-                            <ItemsControl ItemsSource="{Binding Access}" IsVisible="{Binding HasAccess}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:AccessRowViewModel">
-                                        <Grid ColumnDefinitions="130,*" Margin="0,3">
-                                            <TextBlock Grid.Column="0" Text="{Binding Who}" Classes="help" />
-                                            <StackPanel Grid.Column="1" Spacing="1">
-                                                <TextBlock Text="{Binding Can}" FontSize="12.5" Foreground="{Binding Brush}"
-                                                           TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Through, StringFormat='through {0}'}" Classes="help"
-                                                           IsVisible="{Binding HasThrough}" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-
-                        <StackPanel Spacing="4" IsVisible="{Binding HasFindings}">
-                            <TextBlock Classes="phead" Text="FINDINGS" />
-                            <ItemsControl ItemsSource="{Binding Findings}" Margin="-8,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ProblemRowViewModel">
-                                        <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
-                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                                                <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
-                                                         Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12.5"
-                                                           Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
-                                            </Grid>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </StackPanel>
                     </Panel>
                 </ScrollViewer>
             </Border>
         </Grid>
+
+        <!-- What's staged, on both pages: what it does to the ratings, and the way to Review. -->
+        <Border Grid.Row="4" Classes="panel" Padding="16,10" Margin="0,14,0,0" IsVisible="{Binding HasResult}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding PendingSummary}" Classes="field" VerticalAlignment="Center" />
+                    <ItemsControl ItemsSource="{Binding RatingChanges}" IsVisible="{Binding HasRatingChanges}" VerticalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="14" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RatingChangeViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="{Binding Name}" Classes="help" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Before}" FontSize="11.5" FontWeight="Bold" Foreground="{Binding BeforeBrush}" />
+                                    <TextBlock Text="→" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" />
+                                    <TextBlock Text="{Binding After}" FontSize="11.5" FontWeight="Bold" Foreground="{Binding AfterBrush}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Classes="secondary" Content="{Binding StageRecommendedLabel}" Command="{Binding StageRecommendedCommand}"
+                            IsVisible="{Binding CanStageRecommended}"
+                            ToolTip.Tip="Every fix that doesn't change which tool runs or remove something you might still use" />
+                    <Button Classes="secondary" Content="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding HasStaged}" />
+                    <Button Classes="primary" Content="Review &amp; apply" Command="{Binding ReviewCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

@@ -109,7 +109,7 @@
                                    Text="Could be shadowed: someone can write to a folder searched before System32, so any Windows command could be swapped." />
                         <ItemsControl ItemsSource="{Binding AtRisk}" Margin="-8,0">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ProblemRowViewModel">
+                                <DataTemplate x:DataType="vm:DashboardItemViewModel">
                                     <Button Classes="row" Command="{Binding OpenCommand}" Padding="8,5">
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                                             <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"

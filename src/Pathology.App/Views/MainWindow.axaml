@@ -45,6 +45,14 @@
         <Style Selector="Border.navitem.active > Grid > TextBlock.navlabel">
             <Setter Property="Foreground" Value="{DynamicResource NavItemActiveTextBrush}" />
         </Style>
+        <!-- A page under a group ("System" under "Entries"): indented, so the group reads as its parent. -->
+        <Style Selector="Button.nav.nested">
+            <Setter Property="Margin" Value="14,1,0,1" />
+        </Style>
+        <!-- The group row itself: never filled, but its label brightens while one of its pages is showing. -->
+        <Style Selector="Border.navitem.group.open > Grid > TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource NavItemActiveTextBrush}" />
+        </Style>
     </Window.Styles>
 
     <Grid ColumnDefinitions="200,*">
@@ -76,6 +84,15 @@
                         <TextBlock Text="{Binding UpdateButtonLabel}" />
                     </Button>
                     <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="4,0,4,4" />
+                    <Button Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="{Binding Learn}"
+                            AutomationProperties.AutomationId="nav:Learn">
+                        <Border Classes="navitem" Classes.active="{Binding Learn.IsActive}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="navlabel" Text="Learn" FontSize="14"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Button>
                     <Button Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="{Binding Settings}"
                             AutomationProperties.AutomationId="nav:Settings">
                         <Border Classes="navitem" Classes.active="{Binding Settings.IsActive}">
@@ -101,15 +118,23 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding NavItems}" Margin="8,4">
                         <ItemsControl.DataTemplates>
-                            <!-- Section label ("Diagnose" / "Understand") -->
-                            <DataTemplate DataType="vm:NavHeaderViewModel">
-                                <TextBlock Text="{Binding Label}" FontSize="10" FontWeight="SemiBold"
-                                           LetterSpacing="1.5" Foreground="{DynamicResource NavSectionBrush}"
-                                           Margin="12,14,12,4" />
+                            <!-- A group ("Entries"): opens its first page; its pages follow it, indented. -->
+                            <DataTemplate DataType="vm:NavGroupViewModel">
+                                <Button Classes="nav"
+                                        AutomationProperties.AutomationId="{Binding Label, StringFormat='nav:{0}'}"
+                                        Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).OpenGroupCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Border Classes="navitem group" Classes.open="{Binding IsActive}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Classes="navlabel" Text="{Binding Label}"
+                                                       FontSize="14" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </Button>
                             </DataTemplate>
                             <!-- Navigable page (matches any PageViewModel subclass) -->
                             <DataTemplate DataType="vm:PageViewModel">
-                                <Button Classes="nav"
+                                <Button Classes="nav" Classes.nested="{Binding IsNested}"
                                         AutomationProperties.AutomationId="{Binding Title, StringFormat='nav:{0}'}"
                                         Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).NavigateCommand}"
                                         CommandParameter="{Binding}">

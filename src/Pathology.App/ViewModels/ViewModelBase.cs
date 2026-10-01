@@ -11,6 +11,9 @@ public abstract partial class PageViewModel : ViewModelBase
     /// <summary>Nav label / header for the page.</summary>
     public abstract string Title { get; }
 
+    /// <summary>Shown indented in the nav, under a <see cref="NavGroupViewModel"/>.</summary>
+    public virtual bool IsNested => false;
+
     /// <summary>True when this is the page currently shown — drives the left-nav highlight.</summary>
     [ObservableProperty] private bool _isActive;
 
@@ -31,8 +34,24 @@ public abstract partial class PageViewModel : ViewModelBase
     protected virtual void OnActivated() { }
 }
 
-/// <summary>A non-interactive section label in the left nav (e.g. "Diagnose", "Understand").</summary>
-public sealed class NavHeaderViewModel(string label)
+/// <summary>
+/// A nav row that holds the pages nested under it ("Entries" over System and User). It isn't a page itself:
+/// clicking it opens its first page, and it reads as active while any of them is showing.
+/// </summary>
+public sealed partial class NavGroupViewModel : ObservableObject
 {
-    public string Label { get; } = label;
+    public NavGroupViewModel(string label, IReadOnlyList<PageViewModel> pages)
+    {
+        Label = label;
+        Pages = pages;
+        foreach (var page in pages)
+            page.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PageViewModel.IsActive)) OnPropertyChanged(nameof(IsActive));
+            };
+    }
+
+    public string Label { get; }
+    public IReadOnlyList<PageViewModel> Pages { get; }
+    public bool IsActive => Pages.Any(p => p.IsActive);
 }

@@ -18,7 +18,7 @@ See **[capabilities.md](capabilities.md)** for the full capability set. This pla
 | **Health** | *Changed in M3.* Security, Correctness and Hygiene are each rated by their **worst problem**: Clean, Low, Medium or High. No number and no overall verdict. Findings that share a root cause are one problem. Info findings are notes and never rate a category. |
 | **Editing (M6)** | Apply generated fixes, plus light editing: reorder, remove, add, and move an entry between user and machine scope. Every change goes through the same dry-run → diff → backup → apply pipeline. |
 | **Elevation** | The app **always runs unelevated** (`asInvoker`). The SYSTEM and elevated perspectives come from ACL evaluation against synthetic SID sets, so a scan never needs admin. In M6, machine-scope writes go to an elevated helper (the same exe run with a verb), with one UAC prompt per apply batch. |
-| **Pages** | Health (landing), Findings, Entries, Shadowing, Learn. Settings and About are pinned to the bottom of the nav, as in emuwren. |
+| **Pages** | *Changed 2026-10-01 ([UI rationalisation](#ui-rationalisation--fewer-pages-fixing-on-the-entry)).* Dashboard (landing), Entries → System and User, Shadowing, History. Learn sits with Settings and About at the bottom of the nav; Review is reached from the pending bar. Findings and Fix are gone. |
 | **Theme** | `ArcticGizmo.Avalonia.Palette` (the full package with `ThemeManager`), fixed to **Nord (Dark)**. Its tokens map onto emuwren's brush keys, so views are written the same way. No picker in v1.0, but the package leaves room for one. |
 | **Release** | Perch's hardened workflow: actions pinned to SHAs, read-only default permissions, separate build and release jobs, and `SHA256SUMS.txt`. Also `global.json`, `.config/dotnet-tools.json` (vpk), and the `install.ps1` one-liner with its ASCII-purity test. **Windows only**, so there is a single build job. |
 | **Updates** | Emuwren style: check on launch, a blue "Update available" button above Settings in the nav, and About showing the version, a check button, and download → install → restart. |
@@ -358,6 +358,8 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 
 ## Milestone 4 — UI
 
+> *The pages below were reshaped on 2026-10-01: see [UI rationalisation](#ui-rationalisation--fewer-pages-fixing-on-the-entry).*
+
 Layout follows emuwren: a 200px nav on the left, and pages that are a `ScrollViewer` holding a
 `StackPanel MaxWidth≈860` with a title, help text and a Re-scan button at the top right. *Health and Shadowing
 are that shape at 980 wide (three cards need the room). Findings, Entries and Learn are master/detail and fill
@@ -604,6 +606,51 @@ writers sit in `Pathology.Windows` behind Core interfaces, and only `AppServices
 - [ ] **By hand, on the dev PC** ([manual-testing.md](manual-testing.md) §4): apply a user-only fix (no
       prompt), apply a machine fix and a lock-down (one prompt), decline a prompt, undo each, and re-scan to
       see the ratings move back.
+
+## UI rationalisation — fewer pages, fixing on the entry
+
+> **Decided and built 2026-10-01.** Seven pages was too many to hold in your head, and a problem's explanation
+> (Findings), its entry (Entries) and its fix (Fix) lived on three of them. Now each entry is where you see what's
+> wrong with it and do something about it. 425 Core/App + 51 Windows tests; every page re-reviewed by eye through
+> `pathology render`. The M4 and M6 UI notes above describe the pages as they were.
+
+Decisions (asked, not assumed): changes are **staged** and applied together from one Review (one UAC prompt per
+batch, the M6 pipeline unchanged); an entry's problems and actions are in a **side panel**, with the actions on a
+**right-click menu** too; manual editing keeps **move, reorder, edit text and delete** but drops *add an entry*;
+the Dashboard **only links** to entries, so all fixing happens in one place.
+
+- [x] **Nav:** Dashboard; an *Entries* group (opens System) over **System** and **User**, indented, with badges
+      counting entries that have a problem; Shadowing; History. Learn, Settings and About at the bottom.
+      *"System" is Windows' own word (System variables); finding text from Core still says "machine PATH".*
+- [x] **`PendingChanges`** (App, pure): what Fix's view-model held — the suggested fixes and whether each is
+      staged (kept by fix id across a re-scan), your own edits (dropped on a re-scan), the draft, the folder plan,
+      the change set and its projection — shared by both entry pages, the Dashboard and Review. **Nothing is staged
+      to begin with**; *Stage the recommended fixes* does what Fix's default ticks did.
+- [x] **System / User pages:** the PATH as it would be, a line that's gone struck through where it was. Each line
+      says what's there ("missing", "junction") and what's staged for it ("removed", "moves to the user PATH",
+      "moved from #3", "fix staged: …"). Only a line that really moved says "moved from": the rest of the PATH
+      shifting around it doesn't count (the longest unchanged run, as Review's diff works it out). Fixes about the
+      whole value (its kind, Windows first, putting Windows' folders back) sit in a card above the list.
+- [x] **The side panel:** the entry, what's staged for it (with *Put it back* / *Undo my changes*), its problems
+      (each with why it matters, the fix to stage or what to do by hand, and its Learn article), fixes that change
+      it for another line's problem, the actions (↑ ↓, move to the other PATH, edit, delete), its notes, and folded
+      away, what's there and who can write it. *A problem with no fix of its own whose every entry a fix removes
+      or moves away counts as fixed by that fix:* a folder in your profile that's in the system PATH is writable by
+      you (SEC-01) and in the wrong PATH (COR-04), and the move to your user PATH settles both.
+- [x] **Pending bar** on both pages: what's staged, the ratings it moves, Discard, and *Review & apply*.
+- [x] **Review:** what's staged (each fix can be unstaged there), Fix's "what changes" panel, and Apply → confirm.
+      After an apply that wrote something, staging is cleared and the re-scan starts afresh.
+- [x] **Dashboard:** the three ratings (compact), *Things to fix* (every problem with a fix, worst first, each
+      opening its entry, "staged" once it is), *Worth knowing* (problems with no fix, and notes about the PATH as a
+      whole, each unfolding to say what to do), a one-line summary, and *What the scan looked at* folded away. The
+      UAC exposure and headroom panels went: SEC-07 and COR-08 are listed when they apply.
+- [x] Shadowing's "could be shadowed" rows open the entry. History is unchanged (it's the audit log).
+- [x] Renderer poses: `system_staged`, `review_staged`, `review_confirm`, `review_windows_first`, `user_edited`,
+      `system_move_to_user`, `review_move_to_user`, `review_applied`, `system_clean`, `dashboard_unfolded`,
+      `system_phantom`, `user_quotes`, plus every page for the worst case and an empty PATH.
+- *Lost on purpose:* Findings' filters and *Copy details*, the per-row who-can-write squares (the panel's details
+  have the full picture), the *Highlight defects* toggle (always on), *Recommended order* (Windows-first stays, as
+  a fix), and *add an entry*.
 
 ## Later milestones (outline only)
 

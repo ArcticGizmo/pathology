@@ -9,11 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Fix** — PATHology now fixes what it finds, not just tuts at it. Your PATH as it would be, each line with
-  the fixes that change it (the safe ones come pre-ticked). Removed lines stay put, struck through, so you can
-  change your mind where you made it. Click a line to nudge it around by hand, and see exactly what would change
-  before anything does: the ratings before and after, every entry added, removed or moved, every folder's new
-  permissions, and every command that would start running something else.
+- **Fixing, on the entry it's about** — PATHology now fixes what it finds, not just tuts at it. Pick an entry
+  on the System or User page and the panel beside it says what's wrong, why it matters, and the fix to stage.
+  Right-click for the same. Move it, reorder it, edit it or delete it while you're there. Nothing is staged until
+  you ask (or press *Stage the recommended fixes*), and removed lines stay put, struck through, so you can change
+  your mind where you made it.
+- **Review** — everything staged, in one place, before anything happens: the ratings before and after, every
+  entry added, removed or moved, every folder's new permissions, and every command that would start running
+  something else. Then one Apply.
 - **Folder lock-downs** — writable PATH folders get their permissions trimmed to read & execute for everyone
   but administrators, applied by the app itself, with the equivalent icacls commands on offer to copy.
   A folder inside your own profile gets moved to your user PATH instead, because locking you out of your own
@@ -21,25 +24,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **One UAC prompt per apply, and only when needed** — changes to your user PATH never ask. The elevated helper
   checks the change it's handed against a hash, writes nothing else, and is believed only after its work has
   been read back.
-- **Move a machine entry to your user PATH from Entries** — sets the move up on Fix to check and apply. The
-  copy goes into your user PATH before the machine PATH lets it go, so an apply that stops half-way leaves the
-  entry in both rather than in neither. Decline the UAC prompt and the copy is taken back out.
+- **Move a system entry to your user PATH** — the copy goes into your user PATH before the system PATH lets
+  it go, so an apply that stops half-way leaves the entry in both rather than in neither. Decline the UAC prompt
+  and the copy is taken back out.
 - **History and Undo** — every apply backs up what it replaces first, records each write, and can be undone in
   one click. The undo is undoable too, for the indecisive.
 - **Nothing changed since the scan, or nothing changes** — an apply that finds your PATH or a folder different
   from what the scan saw refuses the lot rather than guessing.
-- **The PATHology app** — Health, Findings, Entries, Shadowing and Learn, in Nord (Dark), all drawn from one
-  read-only scan that runs when the app opens (switchable in Settings) and again on Re-scan.
-- **Health** — the three ratings side by side, what's holding each one up, and the worst few problems, plus
-  UAC exposure, how close PATH is to its length limits, and what the scan looked at.
-- **Findings** — every problem worst first, one row per cause, filterable, each with what, why, how to fix
-  it and the permission that makes it possible. Copy details pastes it into a ticket.
-- **Entries** — both PATHs in search order, exactly as stored with what each `%VARIABLE%` expands to beneath,
-  who can write each folder from four points of view, and stray quotes and spaces picked out where they hide.
+- **The PATHology app** — a Dashboard, the System and User PATHs, Shadowing and History, with Learn for the
+  curious, in Nord (Dark), all drawn from one read-only scan that runs when the app opens (switchable in
+  Settings) and again on Re-scan.
+- **Dashboard** — the three ratings side by side and what's holding each one up, then every problem worst
+  first: the ones PATHology can fix (each opens its entry), and the ones it can only explain (each unfolds to
+  say what to do about it).
+- **System and User** — each PATH in search order, exactly as stored with what each `%VARIABLE%` expands to
+  beneath, stray quotes and spaces picked out where they hide, and, folded away until you want it, who can
+  write each folder from four points of view.
 - **Shadowing** — type a command, see which file runs and which ones it hides. Windows commands that
   something else is already answering for are listed, which is usually news.
-- **Learn** — seven short articles on how Windows really finds commands and DLLs, linked from the findings
-  that need them.
+- **Learn** — seven short articles on how Windows really finds commands and DLLs, linked from the problems
+  that need them. Entirely optional reading, which is why it's at the bottom.
 - **Export a redacted snapshot** from Settings, for bug reports. Script and tool names outside Windows, and
   variable names PATH doesn't use, are swapped for placeholders too, so a bug report doesn't double as a list
   of the projects you work on.

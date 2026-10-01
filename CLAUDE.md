@@ -46,7 +46,8 @@ helper — run **only from production code driven by a real user click**:
 - Never run `pathology apply-elevated` (the helper verb) by hand, from a script or from a test, and never call
   `ElevatedHelper.Run` in-process: run elevated, it would write the real machine.
 - Everything before Apply is pure (`RemediationPlanner`, `AclPlanner`, `PlanProjection`, `AclDesigner`), so test
-  and pose that freely. The renderer poses Fix and History states on the view-models and never applies.
+  and pose that freely. Staging (`PendingChanges`) is pure too. The renderer poses staged, Review and History
+  states on the view-models and never applies.
 
 ## 🛑 No PII in fixtures, captures or exports
 

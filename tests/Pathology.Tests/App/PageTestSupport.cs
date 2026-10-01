@@ -9,12 +9,34 @@ internal sealed class RecordingNavigator : INavigator
 {
     public List<object> Calls { get; } = [];
 
-    public void ToFindings(FindingsQuery query) => Calls.Add(query);
     public void ToEntry(PathScope scope, int index) => Calls.Add((scope, index));
+    public void ToEntries(PathScope scope) => Calls.Add(scope);
     public void ToLearn(string topic) => Calls.Add("learn:" + topic);
     public void ToCommand(string command) => Calls.Add("command:" + command);
-    public void ToFix(PathScope scope, int index) => Calls.Add(("fix", scope, index));
-    public void ToFixMovingToUser(int machineIndex) => Calls.Add(("move-to-user", machineIndex));
+    public void ToReview() => Calls.Add("review");
+}
+
+/// <summary>The staging model and both entry pages over one session, the way the shell wires them.</summary>
+internal sealed class EntryPages
+{
+    public EntryPages(ScanSession? session = null)
+    {
+        Session = session ?? Sessions.Showing(Pathology.App.Rendering.PosedMachines.Messy());
+        Pending = new PendingChanges(Session, Repair);
+        System = new EntriesViewModel(PathScope.Machine, Session, Navigator, Pending);
+        User = new EntriesViewModel(PathScope.User, Session, Navigator, Pending);
+    }
+
+    public ScanSession Session { get; }
+    public RecordingRepair Repair { get; } = new();
+    public RecordingNavigator Navigator { get; } = new();
+    public PendingChanges Pending { get; }
+    public EntriesViewModel System { get; }
+    public EntriesViewModel User { get; }
+
+    /// <summary>The live (not struck-through) line whose text is this.</summary>
+    public static EntryRowViewModel Line(EntriesViewModel page, string text) =>
+        page.Rows.Single(r => !r.IsGhost && r.Text == text);
 }
 
 internal static class Sessions

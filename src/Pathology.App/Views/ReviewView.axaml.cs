@@ -2,23 +2,18 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using Pathology.App.Controls;
 using Pathology.App.ViewModels;
 
 namespace Pathology.App.Views;
 
-public partial class FixView : UserControl
+public partial class ReviewView : UserControl
 {
-    public FixView()
-    {
-        InitializeComponent();
-        KeepSelectionVisible.Attach(this, nameof(FixViewModel.ArrivedRow), vm => ((FixViewModel)vm).ArrivedRow);
-    }
+    public ReviewView() => InitializeComponent();
 
     /// <summary>Put the lock-downs on the clipboard as icacls commands, to read or run by hand.</summary>
     async void OnCopyCommands(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not FixViewModel { Plan: { HasCommandsText: true } plan } || sender is not Button button) return;
+        if (DataContext is not ReviewViewModel { Plan: { HasCommandsText: true } plan } || sender is not Button button) return;
         if (TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
 
         await clipboard.SetTextAsync(plan.CommandsText);

@@ -26,13 +26,6 @@ internal static class Severities
     /// <summary>A category's rating as its card shows it: "HIGH" … "CLEAN".</summary>
     public static string RatingWord(Severity? rating) => rating is { } r ? Word(r).ToUpperInvariant() : "CLEAN";
 
-    public static string ScopeWord(PathScope? scope) => scope switch
-    {
-        PathScope.Machine => "machine",
-        PathScope.User => "user",
-        _ => "both",
-    };
-
     public static string PerspectiveName(Perspective perspective) => perspective switch
     {
         Perspective.CurrentUserUnelevated => "You",
@@ -49,16 +42,6 @@ internal static class Severities
         Perspective.CurrentUserElevated => "you elevated",
         Perspective.System => "SYSTEM",
         Perspective.StandardUser => "a standard user",
-        _ => perspective.ToString(),
-    };
-
-    /// <summary>The short column header for the Entries matrix.</summary>
-    public static string PerspectiveShort(Perspective perspective) => perspective switch
-    {
-        Perspective.CurrentUserUnelevated => "You",
-        Perspective.CurrentUserElevated => "Elev.",
-        Perspective.System => "SYSTEM",
-        Perspective.StandardUser => "Std",
         _ => perspective.ToString(),
     };
 

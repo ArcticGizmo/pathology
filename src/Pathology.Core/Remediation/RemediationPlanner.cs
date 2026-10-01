@@ -262,7 +262,7 @@ public static class RemediationPlanner
         return Fix(
             title: "Search the Windows folders first",
             edits: [new Reorder(PathScope.Machine, windows.Select(w => w.Id).ToList())],
-            note: "A program ahead of them that shares a name with a Windows command stops winning. The command changes below say which.",
+            note: "A program ahead of them that shares a name with a Windows command stops winning. Review lists the commands that change.",
             recommended: false) with
         {
             Id = WindowsFirstId,

@@ -1,179 +1,352 @@
-using System.Globalization;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Pathology.App.Controls;
 using Pathology.App.Scanning;
 using Pathology.App.Theming;
 using Pathology.Core.Detection;
+using Pathology.Core.Learn;
 using Pathology.Core.Model;
+using Pathology.Core.Remediation;
 using static Pathology.App.Theme;
 
 namespace Pathology.App.ViewModels;
 
 /// <summary>
-/// The machine and user PATH, in the order Windows searches them: each entry's text, what's there, who can write
-/// it from each perspective, and the findings about it. The detail pane has everything the scan captured.
+/// One PATH, system or user, as it would be once what's staged is applied: each entry in the order Windows searches
+/// it. Picking an entry shows its problems, what can be done about each, and the moves, edits and deletions you can
+/// make yourself. Everything is staged; the pending bar takes you to Review to apply it.
 /// </summary>
 public sealed partial class EntriesViewModel : ScanPageViewModel
 {
-    public EntriesViewModel(ScanSession session, INavigator navigator) : base(session, navigator) => Rebuild(session.Current);
+    (int Id, bool Ghost)? _key;
 
-    public override string Title => "Entries";
+    public EntriesViewModel(PathScope scope, ScanSession session, INavigator navigator, PendingChanges pending)
+        : base(session, navigator)
+    {
+        Scope = scope;
+        Pending = pending;
+        pending.Changed += (_, _) => Refresh();
+        Refresh();
+    }
 
-    /// <summary>The perspectives, in matrix column order.</summary>
-    public static IReadOnlyList<Perspective> Columns { get; } =
-        [Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated, Perspective.System, Perspective.StandardUser];
+    public PathScope Scope { get; }
+    public PendingChanges Pending { get; }
 
-    public IReadOnlyList<string> ColumnHeaders { get; } = Columns.Select(Severities.PerspectiveShort).ToList();
+    public override string Title => Scope == PathScope.Machine ? "System" : "User";
+    public override bool IsNested => true;
 
-    [ObservableProperty] private IReadOnlyList<EntrySectionViewModel> _sections = [];
+    public string Heading => Scope == PathScope.Machine ? "System PATH" : "User PATH";
 
-    /// <summary>Pick out quotes, stray spaces, doubled and forward slashes in the text.</summary>
-    [ObservableProperty] private bool _showDefects = true;
+    public string Help => Scope == PathScope.Machine
+        ? "Every account on this PC gets these, searched before your own. Pick an entry to see what's wrong with it and what can be done. Changes are staged until you review and apply them."
+        : "Yours alone, searched after the system PATH. Pick an entry to see what's wrong with it and what can be done. Changes are staged until you review and apply them.";
+
+    [ObservableProperty] private IReadOnlyList<EntryRowViewModel> _rows = [];
+    [ObservableProperty] private IReadOnlyList<FixRowViewModel> _valueFixes = [];
+    [ObservableProperty] private string _summary = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection))]
     private EntryRowViewModel? _selected;
 
-    [ObservableProperty] private EntryDetailViewModel? _detail;
+    [ObservableProperty] private EntryPanelViewModel? _panel;
+
+    /// <summary>The panel's folded-away details are open. Kept for the page, so it stays open from entry to entry.</summary>
+    [ObservableProperty] private bool _showDetails;
 
     public bool HasSelection => Selected is not null;
+    public bool HasRows => Rows.Count > 0;
+    public bool HasValueFixes => ValueFixes.Count > 0;
+    public string ValueHeading => $"THE WHOLE {Heading.ToUpperInvariant()}";
+
+    // The pending bar.
+    public bool HasStaged => Pending.HasStaged;
+    public string PendingSummary => Pending.HasStaged ? Pending.Summary : "Nothing staged.";
+    public IReadOnlyList<RatingChangeViewModel> RatingChanges => Pending.Plan?.RatingChanges ?? [];
+    public bool HasRatingChanges => Pending.HasStaged && Pending.Plan is { HasRatingChanges: true };
+    public bool CanStageRecommended => Pending.UnstagedRecommended > 0;
+    public string StageRecommendedLabel => Pending.UnstagedRecommended == 1
+        ? "Stage the recommended fix"
+        : $"Stage the {Pending.UnstagedRecommended} recommended fixes";
+
+    /// <summary>Scan results arrive through <see cref="PendingChanges"/>, which re-plans first and then tells every page.</summary>
+    protected override void Rebuild(ScanResult? result) { }
+
+    void Refresh()
+    {
+        var result = Pending.Result;
+        if (result is null)
+        {
+            Rows = [];
+            ValueFixes = [];
+            Summary = "";
+            NavCount = 0;
+            Selected = null;
+            RaiseBar();
+            return;
+        }
+
+        var draft = Pending.Draft;
+        var entries = draft.EntriesIn(Scope);
+        // Of the entries here before and after, the longest run that kept its order stayed put; only the rest moved.
+        var was = Pending.Base.EntriesIn(Scope).Select(e => e.Id).ToList();
+        var now = entries.Select(e => e.Id).ToList();
+        var stayed = ValueDiffViewModel.KeptInOrder(was.Where(now.Contains).ToList(), now.Where(was.Contains).ToList());
+        var live = entries.Select((e, i) => new EntryRowViewModel(e, Scope, i, entries.Count, this, moved: was.Contains(e.Id) && !stayed.Contains(e.Id))).ToList();
+
+        // A line that's gone (removed, or moved to the other PATH) stays where it was, struck through, after the last
+        // line before it (in the scan) that's still here.
+        var after = new Dictionary<int, List<EntryRowViewModel>>();
+        var rows = new List<EntryRowViewModel>();
+        int? anchor = null;
+        foreach (var e in Pending.Base.EntriesIn(Scope))
+        {
+            if (draft.Locate(e.Id) is { } at && at.Scope == Scope) { anchor = e.Id; continue; }
+            var ghost = new EntryRowViewModel(e, Scope, -1, 0, this, moved: false);
+            if (anchor is not { } a) rows.Add(ghost);
+            else if (after.TryGetValue(a, out var list)) list.Add(ghost);
+            else after[a] = [ghost];
+        }
+        foreach (var row in live)
+        {
+            rows.Add(row);
+            if (after.TryGetValue(row.Entry.Id, out var gone)) rows.AddRange(gone);
+        }
+        // (The empty slot Windows' own trailing ';' leaves isn't in the draft: it isn't an entry.)
+        Rows = rows;
+
+        ValueFixes = Pending.FixesFor(Scope);
+        Summary = draft.KindOf(Scope) switch
+        {
+            PathValueKind.Missing => "not set",
+            PathValueKind.String => "REG_SZ",
+            PathValueKind.ExpandString => "REG_EXPAND_SZ",
+            _ => "not a string value, so Windows ignores it",
+        } + $" · {PendingChanges.Words(live.Count, "entry", "entries")}";
+        NavCount = result.Snapshot.EntriesIn(Scope).Count(e => result.GroupsFor(e).Any(g => g.Severity > Severity.Info));
+
+        Selected = Find(_key) ?? Find(_key is { } k ? (k.Id, !k.Ghost) : null) ?? Rows.FirstOrDefault(r => !r.IsGhost) ?? Rows.FirstOrDefault();
+        RaiseBar();
+    }
+
+    EntryRowViewModel? Find((int Id, bool Ghost)? key) =>
+        key is { } k ? Rows.FirstOrDefault(r => r.Entry.Id == k.Id && r.IsGhost == k.Ghost) : null;
+
+    void RaiseBar()
+    {
+        OnPropertyChanged(nameof(HasRows));
+        OnPropertyChanged(nameof(HasValueFixes));
+        OnPropertyChanged(nameof(HasStaged));
+        OnPropertyChanged(nameof(PendingSummary));
+        OnPropertyChanged(nameof(RatingChanges));
+        OnPropertyChanged(nameof(HasRatingChanges));
+        OnPropertyChanged(nameof(CanStageRecommended));
+        OnPropertyChanged(nameof(StageRecommendedLabel));
+        DiscardCommand.NotifyCanExecuteChanged();
+        ReviewCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnSelectedChanged(EntryRowViewModel? oldValue, EntryRowViewModel? newValue)
     {
         if (oldValue is not null) oldValue.IsSelected = false;
-        if (newValue is not null) newValue.IsSelected = true;
-        Detail = newValue is null || Result is null ? null : new EntryDetailViewModel(newValue.Entry, Result, Navigator);
-    }
-
-    protected override void Rebuild(ScanResult? result)
-    {
-        var keep = Selected is { } s ? (s.Entry.Scope, s.Entry.Index) : ((PathScope, int)?)null;
-        if (result is null)
+        if (newValue is not null)
         {
-            Sections = [];
-            Selected = null;
-            return;
+            newValue.IsSelected = true;
+            _key = (newValue.Entry.Id, newValue.IsGhost);
         }
-        Sections = [new(PathScope.Machine, result, this), new(PathScope.User, result, this)];
-        var rows = Sections.SelectMany(x => x.Rows).ToList();
-        Selected = (keep is { } k ? rows.FirstOrDefault(r => r.Entry.Scope == k.Item1 && r.Entry.Index == k.Item2) : null)
-                   ?? rows.FirstOrDefault();
+        Panel = newValue is null || Pending.Result is null ? null : new EntryPanelViewModel(newValue, Pending.Result, Navigator);
     }
 
-    /// <summary>Arrive from a finding: select that entry.</summary>
-    public void Select(PathScope scope, int index)
+    /// <summary>Arrive from the Dashboard: pick out the line a scanned entry became.</summary>
+    public bool Select(PathScope scope, int index)
     {
-        if (Sections.SelectMany(s => s.Rows).FirstOrDefault(r => r.Entry.Scope == scope && r.Entry.Index == index) is { } row)
-            Selected = row;
+        if (Pending.IdOf(scope, index) is not { } id) return false;
+        var row = Rows.FirstOrDefault(r => r.Entry.Id == id && !r.IsGhost) ?? Rows.FirstOrDefault(r => r.Entry.Id == id);
+        if (row is null) return false;
+        Selected = row;
+        return true;
     }
 
     internal void Select(EntryRowViewModel row) => Selected = row;
-}
 
-/// <summary>One scope's value: its header (value kind, length) and its entries.</summary>
-public sealed class EntrySectionViewModel
-{
-    public EntrySectionViewModel(PathScope scope, ScanResult result, EntriesViewModel owner)
-    {
-        var value = result.Snapshot.PathFor(scope);
-        Heading = scope == PathScope.Machine ? "MACHINE PATH" : "USER PATH";
-        Summary = value.Kind switch
-        {
-            PathValueKind.Missing => "not set",
-            PathValueKind.Other => "not a string value, so Windows ignores it",
-            _ => $"{(value.Kind == PathValueKind.ExpandString ? "REG_EXPAND_SZ" : "REG_SZ")} · " +
-                 $"{value.Length.ToString("N0", CultureInfo.InvariantCulture)} characters",
-        };
-        Rows = result.Snapshot.EntriesIn(scope)
-            // The trailing ';' Windows writes leaves an empty last entry; it isn't one.
-            .Where(e => !e.Defects.HasFlag(HygieneDefects.TrailingSeparator))
-            .Select(e => new EntryRowViewModel(e, result, owner))
-            .ToList();
-    }
+    [RelayCommand]
+    private void StageRecommended() => Pending.StageRecommended();
 
-    public string Heading { get; }
-    public string Summary { get; }
-    public IReadOnlyList<EntryRowViewModel> Rows { get; }
-    public bool HasRows => Rows.Count > 0;
+    [RelayCommand(CanExecute = nameof(HasStaged))]
+    private void Discard() => Pending.Discard();
+
+    [RelayCommand(CanExecute = nameof(HasStaged))]
+    private void Review() => Navigator.ToReview();
 }
 
 /// <summary>
-/// One cell of the who-can-write matrix. A filled square means that perspective can add files. The colour says
-/// how much that matters: a standard user (red) is anyone on the PC, you (orange) is anything running as you,
-/// and you elevated or SYSTEM (grey) is expected, since administrators can write almost anywhere.
+/// One line of a PATH as it would be: its text, what's there, and whether something staged changes it. A
+/// <see cref="IsGhost"/> line is one that's gone from this PATH, shown where it was. Its commands are the editing
+/// actions the side panel and the right-click menu offer.
 /// </summary>
-public sealed record MatrixCellViewModel(Perspective Perspective, bool? Writable)
-{
-    IBrush Colour => Perspective switch
-    {
-        Perspective.StandardUser => Severities.BrushFor(Severity.High),
-        Perspective.CurrentUserUnelevated => Severities.BrushFor(Severity.Medium),
-        _ => Brush("MutedBrush"),
-    };
-
-    public IBrush Fill => Writable == true ? Colour : Brushes.Transparent;
-    public IBrush Stroke => Writable is null ? Brushes.Transparent : Writable == true ? Colour : Brush("BorderBrush");
-    public string Dash => Writable is null ? "–" : "";
-
-    public string Tip => Writable switch
-    {
-        true => $"{Capitalised} can add files here" + (Perspective is Perspective.System or Perspective.CurrentUserElevated ? " (expected for an administrator)" : ""),
-        false => $"{Capitalised} can't add files here",
-        _ => "Not known: the folder wasn't looked at, or doesn't exist",
-    };
-
-    string Capitalised => Severities.PerspectiveName(Perspective);
-}
-
-/// <summary>One entry in the list.</summary>
 public sealed partial class EntryRowViewModel : ViewModelBase
 {
     readonly EntriesViewModel _owner;
+    readonly int _count;
 
-    public EntryRowViewModel(PathEntry entry, ScanResult result, EntriesViewModel owner)
+    /// <param name="position">Its place in the PATH as it would be, or -1 for a line that's gone.</param>
+    /// <param name="moved">It was moved within this PATH, rather than only shifted by what moved around it.</param>
+    public EntryRowViewModel(DraftEntry entry, PathScope scope, int position, int count, EntriesViewModel owner, bool moved)
     {
         Entry = entry;
+        Scope = scope;
+        Position = position;
+        _count = count;
         _owner = owner;
+        _editText = entry.Text;
+        IsGhost = position < 0;
 
-        var resolved = result.Context.Resolve(entry);
-        var final = resolved.Final;
-        (Status, StatusBrush) = StatusOf(entry, resolved);
+        var pending = owner.Pending;
+        var result = pending.Result!;
+        Scanned = entry.Origin is { } o ? result.Snapshot.EntriesIn(o.Scope).FirstOrDefault(x => x.Index == o.Index) : null;
 
-        var known = final is { Status: ProbeStatus.Probed, Exists: true, IsDirectory: true } && final.Access.Count > 0;
-        Matrix = EntriesViewModel.Columns
-            .Select(p => new MatrixCellViewModel(p, known ? Writability.CanPlantFiles(final!.AccessFor(p)) : null))
-            .ToList();
+        var expanded = pending.Expand(entry.Text);
+        Expanded = string.Equals(expanded, entry.Text, StringComparison.Ordinal) ? "" : expanded;
 
-        var worst = result.GroupsFor(entry).Select(g => (Severity?)g.Severity).Max();
-        HasFinding = worst is not null;
-        FindingBrush = HasFinding ? Severities.BrushFor(worst) : Brushes.Transparent;
+        Fixes = pending.FixesFor(entry.Id);
+        var worst = Scanned is null ? null : result.GroupsFor(Scanned).Where(g => g.Severity > Severity.Info).Select(g => (Severity?)g.Severity).Max();
+        HasProblem = worst is not null;
+        ProblemBrush = HasProblem ? Severities.BrushFor(worst) : Brushes.Transparent;
+
+        var draft = pending.Draft;
+        var original = pending.Base.Find(entry.Id);
+        var wasAt = pending.Base.Locate(entry.Id);
+        var staged = Fixes.FirstOrDefault(f => f.IsStaged);
+        // What it says in the list, and in the side panel after "Staged: ".
+        (Change, var said) = original switch
+        {
+            _ when IsGhost => draft.Locate(entry.Id) is { } to
+                ? Twice($"moves to the {EntryWords.ScopeName(to.Scope)} PATH")
+                : Twice("removed"),
+            null => Twice("added"),
+            _ when wasAt is { } w && w.Scope != scope => Twice($"moved here from the {EntryWords.ScopeName(w.Scope)} PATH"),
+            _ when original.Text != entry.Text => Twice($"was {EntryWords.Shown(original.Text)}"),
+            _ when moved && wasAt is { } w => Twice($"moved from #{w.Index + 1}"),
+            _ when staged is not null => ($"fix staged: {staged.Title}", staged.Title),
+            _ => Twice(""),
+        };
+        ChangeBrush = IsGhost && draft.Locate(entry.Id) is null ? Brush("DangerBrush") : Brush("AccentBrush");
+        StagedLine = said.Length == 0 ? "" : "Staged: " + said;
+
+        static (string, string) Twice(string text) => (text, text);
+
+        (Status, StatusBrush) = Scanned is null ? ("", Brush("MutedBrush")) : StatusOf(Scanned, result.Context.Resolve(Scanned));
     }
 
-    public PathEntry Entry { get; }
+    public DraftEntry Entry { get; }
+    public PathScope Scope { get; }
+    public int Position { get; }
+    public bool IsGhost { get; }
 
-    [ObservableProperty] private bool _isSelected;
+    /// <summary>The entry the scan found, or null for one that wasn't there.</summary>
+    public PathEntry? Scanned { get; }
 
-    public string Position => $"#{Entry.Index + 1}";
+    public string Number => IsGhost ? "" : $"#{Position + 1}";
 
-    /// <summary>The entry exactly as stored, so a <c>%VARIABLE%</c> is always in sight.</summary>
-    public string Text => Entry.Raw;
+    /// <summary>As it will be stored (defects are picked out in the view).</summary>
+    public string Text => Entry.Text;
 
-    /// <summary>What it expands to, shown under it only when that differs.</summary>
-    public string Expanded => Entry.Expanded;
-    public bool HasExpanded => !string.Equals(Entry.Raw, Entry.Expanded, StringComparison.Ordinal);
+    /// <summary>What it expands to, or "" when that's the same.</summary>
+    public string Expanded { get; }
+    public bool HasExpanded => Expanded.Length > 0;
 
+    /// <summary>What's there, in a word or two ("missing", "junction"): blank for an ordinary folder.</summary>
     public string Status { get; }
     public IBrush StatusBrush { get; }
     public bool HasStatus => Status.Length > 0;
 
-    public IReadOnlyList<MatrixCellViewModel> Matrix { get; }
+    /// <summary>What something staged does to it ("removed", "moved from #3"), or "".</summary>
+    public string Change { get; }
+    public IBrush ChangeBrush { get; }
+    public bool HasChange => Change.Length > 0;
 
-    public bool HasFinding { get; }
-    public IBrush FindingBrush { get; }
+    /// <summary>The same, as the side panel says it: "Staged: Lock down C:\Tools".</summary>
+    public string StagedLine { get; }
+
+    public bool HasProblem { get; }
+    public IBrush ProblemBrush { get; }
+
+    /// <summary>The fixes that change this line.</summary>
+    public IReadOnlyList<FixRowViewModel> Fixes { get; }
+
+    [ObservableProperty] private bool _isSelected;
+    [ObservableProperty] private bool _isEditing;
+    [ObservableProperty] private string _editText;
+
+    public string MoveLabel => Scope == PathScope.Machine ? "Move to your user PATH" : "Move to the system PATH";
+    public string MoveTip => Scope == PathScope.Machine
+        ? "It goes to the front of your user PATH, so only you get it. Your user PATH is written first, then it's taken out of the system PATH (one UAC prompt)."
+        : "It goes to the end of the system PATH, so every account gets it (needs admin).";
+
+    internal PendingChanges Pending => _owner.Pending;
 
     [RelayCommand]
     private void Open() => _owner.Select(this);
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private void MoveUp() => Pending.Edit(new MoveEntry(Entry.Id, Scope, Position - 1));
+
+    bool CanMoveUp() => !IsGhost && Position > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private void MoveDown() => Pending.Edit(new MoveEntry(Entry.Id, Scope, Position + 1));
+
+    bool CanMoveDown() => !IsGhost && Position < _count - 1;
+
+    [RelayCommand(CanExecute = nameof(CanMoveScope))]
+    private void MoveScope() => Pending.MoveToOtherScope(Entry.Id);
+
+    bool CanMoveScope() => !IsGhost && Entry.Text.Trim().Length > 0;
+
+    [RelayCommand(CanExecute = nameof(IsLive))]
+    private void Delete() => Pending.Edit(new RemoveEntry(Entry.Id));
+
+    bool IsLive() => !IsGhost;
+
+    [RelayCommand(CanExecute = nameof(IsLive))]
+    private void BeginEdit()
+    {
+        _owner.Select(this);
+        EditText = Entry.Text;
+        IsEditing = true;
+    }
+
+    [RelayCommand]
+    private void SaveEdit()
+    {
+        IsEditing = false;
+        if (EditText != Entry.Text) Pending.Edit(new ReplaceText(Entry.Id, EditText));
+    }
+
+    [RelayCommand]
+    private void CancelEdit() => IsEditing = false;
+
+    /// <summary>You took it out (or moved it away) by hand, so it can be put back.</summary>
+    public bool CanPutBack => IsGhost && Pending.CanPutBack(Entry.Id, Scope);
+
+    [RelayCommand(CanExecute = nameof(CanPutBack))]
+    private void PutBack() => Pending.PutBack(Entry.Id, Scope);
+
+    /// <summary>You moved, reordered or edited it yourself, so that can be undone.</summary>
+    public bool CanRevert => !IsGhost && Pending.HasEditsTo(Entry.Id);
+
+    [RelayCommand(CanExecute = nameof(CanRevert))]
+    private void Revert() => Pending.Revert(Entry.Id);
+
+    /// <summary>Stage every fix for this line.</summary>
+    public bool CanStageFixes => Fixes.Any(f => !f.IsStaged);
+
+    [RelayCommand(CanExecute = nameof(CanStageFixes))]
+    private void StageFixes()
+    {
+        foreach (var fix in Fixes.Where(f => !f.IsStaged).ToList()) fix.IsStaged = true;
+    }
 
     /// <summary>What's at the entry, in a word or two: blank when it's an ordinary, existing folder.</summary>
     internal static (string, IBrush) StatusOf(PathEntry entry, ResolvedEntry resolved)
@@ -196,27 +369,102 @@ public sealed partial class EntryRowViewModel : ViewModelBase
     }
 }
 
-/// <summary>Everything captured about one entry.</summary>
-public sealed partial class EntryDetailViewModel : ViewModelBase
+/// <summary>
+/// The side panel for the picked-out line: what's wrong with it and what can be done about each problem, the
+/// actions you can take yourself, and (folded away) everything the scan captured about it.
+/// </summary>
+public sealed class EntryPanelViewModel
 {
-    readonly INavigator _navigator;
-    readonly PathEntry _entry;
-
-    public EntryDetailViewModel(PathEntry entry, ScanResult result, INavigator navigator)
+    public EntryPanelViewModel(EntryRowViewModel row, ScanResult result, INavigator navigator)
     {
-        _navigator = navigator;
-        _entry = entry;
+        Row = row;
+        var scope = row.Scope == PathScope.Machine ? "System" : "User";
+        Heading = row.IsGhost ? $"Was in the {scope.ToLowerInvariant()} PATH" : $"{scope} PATH #{row.Position + 1}";
+        Status = row.HasStatus ? row.Status : row.Scanned is null ? "" : "an existing folder";
+
+        var issues = new List<IssueViewModel>();
+        var offered = new HashSet<FixRowViewModel>();
+        if (row.Scanned is { } scanned)
+        {
+            foreach (var group in result.GroupsFor(scanned))
+            {
+                var fixes = row.Pending.FixesForProblem(group);
+                offered.UnionWith(fixes);
+                issues.Add(new IssueViewModel(group, fixes, navigator));
+            }
+        }
+        Issues = issues.Where(i => !i.IsNote).ToList();
+        Notes = issues.Where(i => i.IsNote).ToList();
+        OtherFixes = row.Fixes.Where(f => !offered.Contains(f)).ToList();
+        NoProblemsLine = row.Scanned is null || Issues.Count > 0 ? "" : "Nothing wrong with this one.";
+
+        if (row.Scanned is { } entry) (Facts, Access, AccessNote) = EntryFacts.Of(entry, result);
+        else (Facts, Access, AccessNote) = ([], [], "It isn't in the scan, so there's nothing captured about it.");
+    }
+
+    /// <summary>The line itself, whose commands the panel's buttons run.</summary>
+    public EntryRowViewModel Row { get; }
+
+    public string Heading { get; }
+    public string Status { get; }
+    public bool HasStatus => Status.Length > 0;
+
+    public IReadOnlyList<IssueViewModel> Issues { get; }
+    public bool HasIssues => Issues.Count > 0;
+    public IReadOnlyList<IssueViewModel> Notes { get; }
+    public bool HasNotes => Notes.Count > 0;
+
+    /// <summary>Fixes that change this line for a problem it isn't itself listed under (a shared lock-down).</summary>
+    public IReadOnlyList<FixRowViewModel> OtherFixes { get; }
+    public bool HasOtherFixes => OtherFixes.Count > 0;
+
+    public string NoProblemsLine { get; }
+    public bool HasNoProblemsLine => NoProblemsLine.Length > 0;
+
+    public IReadOnlyList<InfoRowViewModel> Facts { get; }
+    public IReadOnlyList<AccessRowViewModel> Access { get; }
+    public bool HasAccess => Access.Count > 0;
+    public string AccessNote { get; }
+    public bool HasAccessNote => AccessNote.Length > 0;
+}
+
+/// <summary>One problem with an entry: what it is, why it matters, and the fix to stage (or what to do by hand).</summary>
+public sealed partial class IssueViewModel(FindingGroup group, IReadOnlyList<FixRowViewModel> fixes, INavigator navigator) : ViewModelBase
+{
+    public FindingGroup Group { get; } = group;
+    public string Title => CharWrapTextBlock.BreakAfterSeparators(Group.Primary.Title);
+    public IBrush SeverityBrush => Severities.BrushFor(Group.Severity);
+    public string SeverityWord => Severities.Word(Group.Severity).ToUpperInvariant();
+    public bool IsNote => Group.Severity == Severity.Info;
+
+    public string Why => Group.Primary.Why;
+
+    public IReadOnlyList<FixRowViewModel> Fixes { get; } = fixes;
+    public bool HasFixes => Fixes.Count > 0;
+
+    /// <summary>What to do about it by hand, when there's nothing to stage.</summary>
+    public string Advice => HasFixes ? "" : Group.Primary.Fix;
+    public bool HasAdvice => Advice.Length > 0;
+
+    public string LearnLabel => Group.Primary.Learn is { } topic && LearnLibrary.Find(topic) is { } article ? $"Learn: {article.Title}" : "";
+    public bool HasLearn => LearnLabel.Length > 0;
+
+    [RelayCommand]
+    private void OpenLearn()
+    {
+        if (Group.Primary.Learn is { } topic) navigator.ToLearn(topic);
+    }
+}
+
+/// <summary>Everything captured about one entry, for the panel's folded-away details.</summary>
+internal static class EntryFacts
+{
+    public static (IReadOnlyList<InfoRowViewModel> Facts, IReadOnlyList<AccessRowViewModel> Access, string AccessNote) Of(PathEntry entry, ScanResult result)
+    {
         var snapshot = result.Snapshot;
         var resolved = result.Context.Resolve(entry);
         var own = resolved.Own;
         var final = resolved.Final;
-
-        Heading = $"{(entry.Scope == PathScope.Machine ? "Machine" : "User")} PATH #{entry.Index + 1}";
-        Raw = entry.Raw;
-        Expanded = entry.Expanded;
-        ExpandedDiffers = !string.Equals(entry.Raw, entry.Expanded, StringComparison.Ordinal);
-        (Status, StatusBrush) = EntryRowViewModel.StatusOf(entry, resolved);
-        if (Status.Length == 0) Status = "an existing folder";
 
         var facts = new List<InfoRowViewModel>
         {
@@ -246,46 +494,20 @@ public sealed partial class EntryDetailViewModel : ViewModelBase
             facts.Add(new("Owner", string.Equals(owner, snapshot.Host.UserSid, StringComparison.OrdinalIgnoreCase) ? "you" : WellKnownSids.NameOf(owner)));
         if (final?.SecurityError is { } error) facts.Add(new("Permissions", $"couldn't be read: {error}"));
         if (final?.CommandFiles is { } files) facts.Add(new("Commands", files.Count == 0 ? "none" : $"{files.Count}: " + string.Join(", ", files.Take(12)) + (files.Count > 12 ? ", …" : "")));
-        Facts = facts;
 
-        Access = final is { Exists: true, Access.Count: > 0 }
-            ? EntriesViewModel.Columns.Select(p => new AccessRowViewModel(p, final.AccessFor(p), snapshot.Host.UserSid)).ToList()
+        IReadOnlyList<AccessRowViewModel> access = final is { Exists: true, Access.Count: > 0 }
+            ? Perspectives.Select(p => new AccessRowViewModel(p, final.AccessFor(p), snapshot.Host.UserSid)).ToList()
             : [];
-        AccessNote = final is null ? "This entry wasn't looked at, so who can write it isn't known."
-            : !final.Exists ? "The folder doesn't exist. Whether someone could create it is what matters: see the findings below."
+        var accessNote = final is null ? "This entry wasn't looked at, so who can write it isn't known."
+            : !final.Exists ? "The folder doesn't exist. Whether someone could create it is what matters: see the problems above."
             : final.Access.Count == 0 ? "Its permissions couldn't be read."
             : resolved.ViaLink ? $"Judged at the link's target, {final.Path}, where files really land." : "";
-
-        Findings = result.GroupsFor(entry).Select(g => new ProblemRowViewModel(g, navigator)).ToList();
+        return (facts, access, accessNote);
     }
 
-    public string Heading { get; }
-    public string Raw { get; }
-    public string Expanded { get; }
-    public bool ExpandedDiffers { get; }
-    public string Status { get; }
-    public IBrush StatusBrush { get; }
-
-    public IReadOnlyList<InfoRowViewModel> Facts { get; }
-
-    public IReadOnlyList<AccessRowViewModel> Access { get; }
-    public bool HasAccess => Access.Count > 0;
-    public string AccessNote { get; }
-    public bool HasAccessNote => AccessNote.Length > 0;
-
-    public IReadOnlyList<ProblemRowViewModel> Findings { get; }
-    public bool HasFindings => Findings.Count > 0;
-
-    /// <summary>Open it in Fix's editor, to move, change or remove it.</summary>
-    [RelayCommand]
-    private void ChangeInFix() => _navigator.ToFix(_entry.Scope, _entry.Index);
-
-    /// <summary>A machine entry with something in it can be moved to your user PATH.</summary>
-    public bool CanMoveToUser => _entry.Scope == PathScope.Machine && _entry.Form != PathForm.Empty;
-
-    /// <summary>Stage the move on Fix, where it's reviewed and applied: a copy goes into your user PATH, then it leaves the machine PATH.</summary>
-    [RelayCommand]
-    private void MoveToUser() => _navigator.ToFixMovingToUser(_entry.Index);
+    /// <summary>The perspectives, in the order the details list them.</summary>
+    static readonly Perspective[] Perspectives =
+        [Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated, Perspective.System, Perspective.StandardUser];
 
     static string FormText(PathForm form) => form switch
     {

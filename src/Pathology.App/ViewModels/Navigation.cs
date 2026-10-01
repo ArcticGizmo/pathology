@@ -1,29 +1,21 @@
-using Pathology.Core.Detection;
 using Pathology.Core.Model;
 
 namespace Pathology.App.ViewModels;
 
-/// <summary>What the Findings page should show when another page sends you there.</summary>
-/// <param name="Category">Only this category, or every one.</param>
-/// <param name="NotesOnly">Only the notes (Info findings).</param>
-/// <param name="RootCause">Select this group.</param>
-public sealed record FindingsQuery(FindingCategory? Category = null, bool NotesOnly = false, string? RootCause = null);
-
-/// <summary>Jumps between pages: Health to a finding, a finding to its entry or its Learn article, and so on.</summary>
+/// <summary>Jumps between pages: the Dashboard to an entry, an entry's problem to its Learn article, and so on.</summary>
 public interface INavigator
 {
-    void ToFindings(FindingsQuery query);
-
+    /// <summary>Open the System or User page with this scanned entry picked out.</summary>
     void ToEntry(PathScope scope, int index);
+
+    /// <summary>Open the System or User page as it is.</summary>
+    void ToEntries(PathScope scope);
 
     void ToLearn(string topic);
 
     /// <summary>Open Shadowing with a command looked up.</summary>
     void ToCommand(string command);
 
-    /// <summary>Open Fix with this entry picked out in the editor.</summary>
-    void ToFix(PathScope scope, int index);
-
-    /// <summary>Open Fix with this machine entry moved to the user PATH in the editor, ready to review and apply.</summary>
-    void ToFixMovingToUser(int machineIndex);
+    /// <summary>Open Review: what's staged, what it changes, and Apply.</summary>
+    void ToReview();
 }

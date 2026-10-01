@@ -205,7 +205,7 @@ public sealed class HistoryDetailViewModel
 /// <summary>A PATH value as a record keeps it: before and after, verbatim.</summary>
 public sealed class ValueRecordViewModel(ValueChange change)
 {
-    public string Heading { get; } = change.Scope == PathScope.Machine ? "MACHINE PATH" : "USER PATH";
+    public string Heading { get; } = change.Scope == PathScope.Machine ? "SYSTEM PATH" : "USER PATH";
     public string Before { get; } = Text(change.Before);
     public string After { get; } = Text(change.After);
 

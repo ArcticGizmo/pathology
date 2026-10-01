@@ -1,11 +1,9 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Pathology.App.Repair;
 using Pathology.App.Scanning;
 using Pathology.App.Updates;
-using Pathology.Core.Detection;
 using Pathology.Core.Model;
 using Pathology.Core.Store;
 
@@ -17,27 +15,33 @@ namespace Pathology.App.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : ViewModelBase, INavigator
 {
-    readonly HealthViewModel _health;
-    readonly FindingsViewModel _findings;
-    readonly EntriesViewModel _entries;
+    readonly DashboardViewModel _dashboard;
+    readonly EntriesViewModel _system;
+    readonly EntriesViewModel _user;
     readonly ShadowingViewModel _shadowing;
-    readonly FixViewModel _fix;
     readonly HistoryViewModel _history;
+    readonly ReviewViewModel _review;
     readonly LearnViewModel _learn;
 
     /// <summary>The scan every page reads.</summary>
     public ScanSession Session { get; }
 
-    /// <summary>Every navigable page — the nav list plus the bottom-pinned Settings and About.</summary>
+    /// <summary>What's staged on the System and User pages, which Review applies.</summary>
+    public PendingChanges Pending { get; }
+
+    /// <summary>Every navigable page: the nav list, Review (reached from the pending bar), and the bottom-pinned pages.</summary>
     public IReadOnlyList<PageViewModel> Pages { get; }
 
-    /// <summary>Left-nav rows: page entries interleaved with section headers ("Diagnose" / "Repair" / "Understand").</summary>
+    /// <summary>Left-nav rows: the pages, with System and User nested under an "Entries" group.</summary>
     public ObservableCollection<object> NavItems { get; } = [];
 
-    /// <summary>The Settings page — pinned to the bottom of the nav, outside the diagnostic sequence.</summary>
+    /// <summary>Learn: a bonus, so it sits with Settings and About at the bottom of the nav.</summary>
+    public LearnViewModel Learn => _learn;
+
+    /// <summary>The Settings page — pinned to the bottom of the nav.</summary>
     public SettingsViewModel Settings { get; }
 
-    /// <summary>The About page — pinned to the bottom of the nav, outside the diagnostic sequence.</summary>
+    /// <summary>The About page — pinned to the bottom of the nav.</summary>
     public AboutViewModel About { get; }
 
     [ObservableProperty] private PageViewModel _currentPage;
@@ -64,44 +68,37 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
     /// <param name="services">The composition root.</param>
     /// <param name="session">The shared scan. The app starts it; the renderer poses it.</param>
     /// <param name="repair">
-    /// What Fix and History apply through. The app passes the real one (<see cref="AppServices.Repair"/>); the
+    /// What Review and History apply through. The app passes the real one (<see cref="AppServices.Repair"/>); the
     /// renderer and tests pass a stand-in that refuses to write.
     /// </param>
     /// <param name="checkForUpdates">Run the launch update check (off for the renderer, which poses the button).</param>
     public MainWindowViewModel(AppServices services, ScanSession session, IRepairService repair, bool checkForUpdates = true)
     {
         Session = session;
-        _health = new HealthViewModel(session, this);
-        _findings = new FindingsViewModel(session, this);
-        _entries = new EntriesViewModel(session, this);
+        // First, so it has re-planned against a new scan before any page redraws from it.
+        Pending = new PendingChanges(session, repair);
+        _dashboard = new DashboardViewModel(session, this, Pending);
+        _system = new EntriesViewModel(PathScope.Machine, session, this, Pending);
+        _user = new EntriesViewModel(PathScope.User, session, this, Pending);
         _shadowing = new ShadowingViewModel(session, this);
         _history = new HistoryViewModel(repair, session);
-        _fix = new FixViewModel(session, this, repair, applied: _history.Reload);
+        _review = new ReviewViewModel(Pending, this, applied: _history.Reload);
         _learn = new LearnViewModel();
         Settings = new SettingsViewModel(services, session);
         About = new AboutViewModel();
 
-        // Settings + About are navigable (so they get active-state highlighting) but live in the bottom nav
-        // slot rather than the diagnostic list, so they're not in NavItems.
-        Pages = [_health, _findings, _entries, _shadowing, _fix, _history, _learn, Settings, About];
+        Pages = [_dashboard, _system, _user, _shadowing, _history, _review, _learn, Settings, About];
 
-        NavItems.Add(new NavHeaderViewModel("Diagnose"));
-        NavItems.Add(_health);
-        NavItems.Add(_findings);
-        NavItems.Add(_entries);
+        NavItems.Add(_dashboard);
+        NavItems.Add(new NavGroupViewModel("Entries", [_system, _user]));
+        NavItems.Add(_system);
+        NavItems.Add(_user);
         NavItems.Add(_shadowing);
-        NavItems.Add(new NavHeaderViewModel("Repair"));
-        NavItems.Add(_fix);
         NavItems.Add(_history);
-        NavItems.Add(new NavHeaderViewModel("Understand"));
-        NavItems.Add(_learn);
 
-        // Land on Health — the ratings are the front door.
-        _currentPage = _health;
-        _health.IsActive = true;
-
-        session.PropertyChanged += OnSessionChanged;
-        UpdateNavCounts(session.Current);
+        // Land on the Dashboard: the ratings and what can be fixed are the front door.
+        _currentPage = _dashboard;
+        _dashboard.IsActive = true;
 
         if (checkForUpdates) _ = CheckForUpdatesAsync();
     }
@@ -109,17 +106,23 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;
 
-    public void ToFindings(FindingsQuery query)
-    {
-        _findings.Apply(query);
-        CurrentPage = _findings;
-    }
+    /// <summary>The "Entries" group row: open its first page.</summary>
+    [RelayCommand]
+    private void OpenGroup(NavGroupViewModel group) => CurrentPage = group.Pages[0];
+
+    EntriesViewModel EntriesFor(PathScope scope) => scope == PathScope.Machine ? _system : _user;
 
     public void ToEntry(PathScope scope, int index)
     {
-        _entries.Select(scope, index);
-        CurrentPage = _entries;
+        // Its own PATH lists it even once it's staged to move away (struck through); the other is a fallback.
+        var page = EntriesFor(scope);
+        if (!page.Select(scope, index) && EntriesFor(Other(scope)).Select(scope, index)) page = EntriesFor(Other(scope));
+        CurrentPage = page;
     }
+
+    static PathScope Other(PathScope scope) => scope == PathScope.Machine ? PathScope.User : PathScope.Machine;
+
+    public void ToEntries(PathScope scope) => CurrentPage = EntriesFor(scope);
 
     public void ToLearn(string topic)
     {
@@ -133,38 +136,15 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
         CurrentPage = _shadowing;
     }
 
-    public void ToFix(PathScope scope, int index)
-    {
-        _fix.Show(scope, index);
-        CurrentPage = _fix;
-    }
-
-    public void ToFixMovingToUser(int machineIndex)
-    {
-        _fix.StageMoveToUser(machineIndex);
-        CurrentPage = _fix;
-    }
+    public void ToReview() => CurrentPage = _review;
 
     // The pages, for the renderer to pose.
-    public HealthViewModel Health => _health;
-    public FindingsViewModel Findings => _findings;
-    public EntriesViewModel Entries => _entries;
+    public DashboardViewModel Dashboard => _dashboard;
+    public EntriesViewModel SystemEntries => _system;
+    public EntriesViewModel UserEntries => _user;
     public ShadowingViewModel Shadowing => _shadowing;
-    public FixViewModel Fix => _fix;
     public HistoryViewModel History => _history;
-    public LearnViewModel Learn => _learn;
-
-    void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ScanSession.Current)) UpdateNavCounts(Session.Current);
-    }
-
-    /// <summary>Findings' badge counts the High problems; Entries' counts the entries.</summary>
-    void UpdateNavCounts(ScanResult? result)
-    {
-        _findings.NavCount = result?.Health.Count(Severity.High) ?? 0;
-        _entries.NavCount = result?.Snapshot.Entries.Count ?? 0;
-    }
+    public ReviewViewModel Review => _review;
 
     /// <summary>Take the user to About, where the update is downloaded, installed, and the app restarts.
     /// Kicks its check on arrival so the Install button is one click away.</summary>
