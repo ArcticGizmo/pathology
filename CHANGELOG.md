@@ -20,6 +20,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **One UAC prompt per apply, and only when needed** — changes to your user PATH never ask. The elevated helper
   checks the change it's handed against a hash, writes nothing else, and is believed only after its work has
   been read back.
+- **Move a machine entry to your user PATH from Entries** — sets the move up on Fix to check and apply. The
+  copy goes into your user PATH before the machine PATH lets it go, so an apply that stops half-way leaves the
+  entry in both rather than in neither. Decline the UAC prompt and the copy is taken back out.
 - **History and Undo** — every apply backs up what it replaces first, records each write, and can be undone in
   one click. The undo is undoable too, for the indecisive.
 - **Nothing changed since the scan, or nothing changes** — an apply that finds your PATH or a folder different

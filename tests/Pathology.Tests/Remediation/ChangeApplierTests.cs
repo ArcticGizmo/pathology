@@ -209,6 +209,118 @@ public class ChangeApplierTests
         Assert.Equal([@"C:\Tools"], undo.Acls.Select(a => a.Path));
     }
 
+    /// <summary><c>C:\Tools</c> moving from the machine PATH to the front of the user PATH.</summary>
+    static ChangeSet MoveToolsToUser() => new()
+    {
+        Values =
+        [
+            new ValueChange { Before = MachineBefore, After = MachineAfter },
+            new ValueChange { Before = UserBefore, After = UserBefore with { Value = "C:\\Tools;\"C:\\Users\\you\\bin\"" } },
+        ],
+    };
+
+    [Fact]
+    public void A_move_to_the_user_PATH_writes_the_copy_before_the_machine_PATH_lets_it_go()
+    {
+        var rig = new Rig();
+        var order = new List<PathScope>();
+        rig.Values.BeforeWrite = v => order.Add(v.Scope);
+
+        var record = rig.Applier.Apply(MoveToolsToUser(), "1 edit");
+
+        Assert.Equal(ChangeOutcome.Applied, record.Outcome);
+        Assert.Equal([PathScope.User, PathScope.Machine], order);
+        Assert.Equal(MachineAfter, rig.Values.Stored[PathScope.Machine]);
+        Assert.StartsWith(@"C:\Tools;", rig.Values.Stored[PathScope.User].Value);
+        Assert.Equal(2, record.Steps.Count);
+    }
+
+    [Fact]
+    public void A_declined_UAC_prompt_during_a_move_puts_the_user_PATH_back()
+    {
+        var rig = new Rig();
+        rig.Elevation.Decline = true;
+
+        var record = rig.Applier.Apply(MoveToolsToUser(), "1 edit");
+
+        Assert.Equal(ChangeOutcome.Cancelled, record.Outcome);
+        Assert.Equal(UserBefore, rig.Values.Stored[PathScope.User]);
+        Assert.Equal(MachineBefore, rig.Values.Stored[PathScope.Machine]);
+        Assert.Equal(2, rig.Values.Writes.Count);
+        Assert.All(record.Steps, s => Assert.Equal(StepStatus.Skipped, s.Status));
+        Assert.False(record.CanUndo);
+    }
+
+    [Fact]
+    public void A_machine_write_that_fails_during_a_move_leaves_the_entry_in_both()
+    {
+        var rig = new Rig();
+        // Something else changes the machine PATH between the two writes, so the helper leaves it alone.
+        rig.Values.BeforeWrite = v =>
+        {
+            if (v.Scope == PathScope.User) rig.Values.Stored[PathScope.Machine] = MachineBefore with { Value = MachineBefore.Value + @";C:\New" };
+        };
+
+        var record = rig.Applier.Apply(MoveToolsToUser(), "1 edit");
+
+        Assert.Equal(ChangeOutcome.Partial, record.Outcome);
+        Assert.StartsWith(@"C:\Tools;", rig.Values.Stored[PathScope.User].Value);
+        Assert.StartsWith(@"C:\Tools;", rig.Values.Stored[PathScope.Machine].Value);
+        Assert.Equal(StepStatus.Failed, record.Steps.Single(s => s.Target == StepResult.MachineTarget).Status);
+        Assert.True(record.CanUndo);
+    }
+
+    [Fact]
+    public void Moves_both_ways_keep_the_upward_entry_in_the_user_PATH_until_the_machine_PATH_has_it()
+    {
+        var rig = new Rig();
+        var userWrites = new List<string?>();
+        rig.Values.BeforeWrite = v => { if (v.Scope == PathScope.User) userWrites.Add(v.Value); };
+        var changes = new ChangeSet
+        {
+            Values =
+            [
+                new ValueChange { Before = MachineBefore, After = MachineBefore with { Value = "%SystemRoot%\\system32;\"C:\\Users\\you\\bin\"" } },
+                new ValueChange { Before = UserBefore, After = UserBefore with { Value = @"C:\Tools" } },
+            ],
+        };
+
+        var record = rig.Applier.Apply(changes, "2 edits");
+
+        Assert.Equal(ChangeOutcome.Applied, record.Outcome);
+        Assert.Equal(["C:\\Tools;\"C:\\Users\\you\\bin\"", @"C:\Tools"], userWrites);
+        Assert.Equal(@"C:\Tools", rig.Values.Stored[PathScope.User].Value);
+    }
+
+    [Fact]
+    public void Only_a_move_to_the_user_PATH_changes_the_order()
+    {
+        Assert.Null(Everything().UserFirst());
+        // The user PATH already has it: the machine copy just goes.
+        Assert.Null(new ChangeSet
+        {
+            Values =
+            [
+                new ValueChange { Before = MachineBefore, After = MachineAfter },
+                new ValueChange { Before = UserBefore with { Value = @"c:\tools\" }, After = UserBefore with { Value = @"c:\tools\;C:\X" } },
+            ],
+        }.UserFirst());
+        Assert.Equal(MoveToolsToUser().ValueFor(PathScope.User)!.After, MoveToolsToUser().UserFirst());
+    }
+
+    [Fact]
+    public void Undoing_a_move_to_the_user_PATH_puts_it_back_in_the_machine_PATH()
+    {
+        var rig = new Rig();
+        var applied = rig.Applier.Apply(MoveToolsToUser(), "1 edit");
+
+        var record = rig.Applier.Apply(applied.Undo(rig.Values.Read, rig.Acls.Read), "Undo of 1 edit", undoOf: applied.Id);
+
+        Assert.Equal(ChangeOutcome.Applied, record.Outcome);
+        Assert.Equal(MachineBefore, rig.Values.Stored[PathScope.Machine]);
+        Assert.Equal(UserBefore, rig.Values.Stored[PathScope.User]);
+    }
+
     [Fact]
     public void Nothing_to_change_is_refused()
     {

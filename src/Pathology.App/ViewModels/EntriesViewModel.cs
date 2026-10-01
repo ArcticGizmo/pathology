@@ -287,6 +287,13 @@ public sealed partial class EntryDetailViewModel : ViewModelBase
     [RelayCommand]
     private void ChangeInFix() => _navigator.ToFix(_entry.Scope, _entry.Index);
 
+    /// <summary>A machine entry with something in it can be moved to your user PATH.</summary>
+    public bool CanMoveToUser => _entry.Scope == PathScope.Machine && _entry.Form != PathForm.Empty;
+
+    /// <summary>Stage the move on Fix, where it's reviewed and applied: a copy goes into your user PATH, then it leaves the machine PATH.</summary>
+    [RelayCommand]
+    private void MoveToUser() => _navigator.ToFixMovingToUser(_entry.Index);
+
     static string FormText(PathForm form) => form switch
     {
         PathForm.Absolute => "a full path",

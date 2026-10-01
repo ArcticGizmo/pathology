@@ -139,6 +139,12 @@ public partial class MainWindowViewModel : ViewModelBase, INavigator
         CurrentPage = _fix;
     }
 
+    public void ToFixMovingToUser(int machineIndex)
+    {
+        _fix.StageMoveToUser(machineIndex);
+        CurrentPage = _fix;
+    }
+
     // The pages, for the renderer to pose.
     public HealthViewModel Health => _health;
     public FindingsViewModel Findings => _findings;

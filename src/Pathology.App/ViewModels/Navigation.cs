@@ -23,4 +23,7 @@ public interface INavigator
 
     /// <summary>Open Fix with this entry picked out in the editor.</summary>
     void ToFix(PathScope scope, int index);
+
+    /// <summary>Open Fix with this machine entry moved to the user PATH in the editor, ready to review and apply.</summary>
+    void ToFixMovingToUser(int machineIndex);
 }

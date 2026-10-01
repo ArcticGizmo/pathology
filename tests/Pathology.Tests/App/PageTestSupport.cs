@@ -14,6 +14,7 @@ internal sealed class RecordingNavigator : INavigator
     public void ToLearn(string topic) => Calls.Add("learn:" + topic);
     public void ToCommand(string command) => Calls.Add("command:" + command);
     public void ToFix(PathScope scope, int index) => Calls.Add(("fix", scope, index));
+    public void ToFixMovingToUser(int machineIndex) => Calls.Add(("move-to-user", machineIndex));
 }
 
 internal static class Sessions

@@ -141,6 +141,16 @@ Have a `cmd` window open throughout, and run `echo %PATH%` in a **new** one afte
 - [ ] History → Undo → accept the prompt: `icacls C:\scripts` shows inherited entries again, the phantom entry is
       back in the machine PATH, and a re-scan matches the start of this section.
 
+### Moving a machine entry to your user PATH (one prompt)
+- [ ] Untick everything on Fix. Entries → pick a machine entry (the VS Code one) → *Move to your user PATH*:
+      Fix opens with it highlighted at the top of the user PATH, and the admin line says the user PATH is
+      written first.
+- [ ] Apply → confirm → **decline** the prompt: CANCELLED, and the user PATH is back exactly (compare with
+      `user-env.reg`); the entry is still in the machine PATH.
+- [ ] Apply again → **accept**: History lists *User PATH* (written before the machine PATH) above *Machine PATH*,
+      both done. A new `cmd`'s PATH has the entry once, in its new place.
+- [ ] History → Undo → accept: the entry is back in the machine PATH and gone from the user PATH.
+
 ### Things that must never happen
 - [ ] A UAC prompt for a user-only change, or more than one prompt for one apply.
 - [ ] Any file appearing in `PATHology Data (Dev)\pending` that outlives an apply.

@@ -136,8 +136,13 @@
                             <TextBlock Classes="phead" Text="{Binding Heading}" />
                             <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" FontSize="13.5" />
                             <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding StatusBrush}" />
-                            <Button Classes="link" HorizontalAlignment="Left" FontSize="12" Content="Change it on Fix"
-                                    Command="{Binding ChangeInFixCommand}" />
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <Button Classes="link" FontSize="12" Content="Change it on Fix"
+                                        Command="{Binding ChangeInFixCommand}" />
+                                <Button Classes="link" FontSize="12" Content="Move to your user PATH"
+                                        Command="{Binding MoveToUserCommand}" IsVisible="{Binding CanMoveToUser}"
+                                        ToolTip.Tip="Sets the move up on Fix to review and apply. Your user PATH gets a copy first, then it's taken out of the machine PATH (one UAC prompt)." />
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Spacing="4" IsVisible="{Binding ExpandedDiffers}">

@@ -120,6 +120,22 @@ public class FixViewModelTests
     }
 
     [Fact]
+    public void Moving_an_entry_your_user_PATH_already_has_removes_the_machine_copy()
+    {
+        var page = Page(out _);
+        foreach (var fix in page.Fixes) fix.IsSelected = false;
+        page.NewEntryText = @"c:\tools\";
+        page.AddCommand.Execute(null);
+        var index = page.Result!.Snapshot.EntriesIn(PathScope.Machine).Single(e => e.Raw == @"C:\Tools").Index;
+
+        page.StageMoveToUser(index);
+
+        Assert.DoesNotContain(@"C:\Tools;", page.Changes.ValueFor(PathScope.Machine)!.After.Value!);
+        Assert.Single(page.Sections[1].Rows, r => r.Entry.Text.Equals(@"c:\tools\", StringComparison.Ordinal));
+        Assert.DoesNotContain(page.Sections[1].Rows, r => r.Entry.Text == @"C:\Tools");
+    }
+
+    [Fact]
     public void Removing_and_editing_an_entry_land_in_the_value()
     {
         var page = Page(out _);

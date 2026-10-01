@@ -40,6 +40,29 @@ public class ShellTests
     }
 
     [Fact]
+    public void Move_to_your_user_PATH_on_Entries_stages_the_move_on_Fix()
+    {
+        using var store = new TempStore();
+        using var services = new AppServices(store.Root);
+        var vm = new MainWindowViewModel(services, Sessions.Showing(PosedMachines.Messy()), new PosedRepair(), checkForUpdates: false);
+        foreach (var fix in vm.Fix.Fixes) fix.IsSelected = false;
+        var tools = vm.Entries.Sections[0].Rows.Single(r => r.Entry.Raw == @"C:\Tools").Entry;
+
+        vm.Entries.Select(PathScope.User, 0);
+        Assert.False(vm.Entries.Detail!.CanMoveToUser);
+        vm.Entries.Select(PathScope.Machine, tools.Index);
+        Assert.True(vm.Entries.Detail!.CanMoveToUser);
+        vm.Entries.Detail.MoveToUserCommand.Execute(null);
+
+        Assert.Same(vm.Fix, vm.CurrentPage);
+        var moved = Assert.Single(vm.Fix.Sections[1].Rows, r => r.IsHighlighted);
+        Assert.Equal(@"C:\Tools", moved.Entry.Text);
+        Assert.DoesNotContain(vm.Fix.Sections[0].Rows, r => r.Entry.Text == @"C:\Tools");
+        Assert.NotNull(vm.Fix.Changes.UserFirst());
+        Assert.Contains("written first", vm.Fix.Plan!.AdminLine);
+    }
+
+    [Fact]
     public void Navigating_lands_on_the_page_with_the_thing_selected()
     {
         using var store = new TempStore();

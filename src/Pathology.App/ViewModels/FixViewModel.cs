@@ -7,6 +7,7 @@ using Pathology.App.Scanning;
 using Pathology.App.Theming;
 using Pathology.Core.Detection;
 using Pathology.Core.Model;
+using Pathology.Core.Normalisation;
 using Pathology.Core.Remediation;
 using static Pathology.App.Theme;
 
@@ -119,6 +120,27 @@ public sealed partial class FixViewModel : ScanPageViewModel
         _highlight = (scope, index);
         Recompute();
     }
+
+    /// <summary>
+    /// Arrive from an entry's "Move to your user PATH": add the move to the editor and show it. When your user PATH
+    /// already has the entry, the machine copy is removed instead, as the planner does: moving it would only make a
+    /// duplicate. Either way the user PATH is written first when it's applied (<see cref="ChangeSet.UserFirst"/>).
+    /// </summary>
+    public void StageMoveToUser(int machineIndex)
+    {
+        _highlight = (PathScope.Machine, machineIndex);
+        var origin = new EntryOrigin(PathScope.Machine, machineIndex);
+        if (_base.Machine.FirstOrDefault(e => e.Origin == origin) is { } entry)
+        {
+            var draft = Draft();
+            var key = PathText.Key(PathText.Strip(entry.Text));
+            var already = draft.User.Any(u => u.Id != entry.Id && PathText.Key(PathText.Strip(u.Text)) == key);
+            _edits.Add(already ? new RemoveEntry(entry.Id) : new MoveToUser(entry.Id));
+        }
+        Recompute();
+    }
+
+    PathDraft Draft() => _base.Apply(Fixes.Where(f => f.IsSelected).SelectMany(f => f.Fix.Edits)).Apply(_edits);
 
     /// <summary>Work out the draft, the folder changes, the change set and its outcome from the choices and edits.</summary>
     void Recompute()
@@ -425,7 +447,9 @@ public sealed class PlanViewModel
         if (adminFolders > 0) admin.Add(DraftSectionViewModel.Words(adminFolders, "folder", "folders"));
         AdminLine = !HasChanges ? ""
             : admin.Count == 0 ? "No UAC prompt: everything here is yours to change."
-            : $"One UAC prompt, for {string.Join(" and ", admin)}.";
+            : $"One UAC prompt, for {string.Join(" and ", admin)}."
+              + (changes.UserFirst() is null ? ""
+                  : " Your user PATH is written first, before the prompt, so a moved entry is never missing from both; if you decline, it's put back.");
     }
 
     public bool HasChanges { get; }

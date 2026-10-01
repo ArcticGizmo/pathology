@@ -543,6 +543,12 @@ writers sit in `Pathology.Windows` behind Core interfaces, and only `AppServices
       re-read and verify each write, broadcast, and record the outcome step by step. *A refusal writes nothing
       and leaves no record. A folder's "before" is compared on its own entries, owner and inheritance setting,
       since a parent locked down earlier in the same apply legitimately changes its inherited ones.*
+- [x] *Added:* **a move to the user PATH writes the user PATH first.** The two values can't change in one write, so
+      `ChangeSet.UserFirst` gives the user PATH to write before the UAC prompt when an entry leaves the machine PATH
+      for it (an entry going the other way stays in that first value until the machine PATH has it). A declined
+      prompt, or a helper that never ran, puts the user PATH back; a machine write that fails leaves the entry in
+      both, never in neither. Found on review: the elevated-first order alone would lose the entry if the user
+      write failed after the machine one.
 - [x] `IPathValueStore` → `RegistryPathValueStore`: writes the existing `Path` value name with the planned kind
       (`REG_EXPAND_SZ` preserved), never truncates, never uses `setx`, re-reads to verify. *No test against the
       real registry, by rule; its logic is a dozen lines.*
@@ -569,7 +575,9 @@ writers sit in `Pathology.Windows` behind Core interfaces, and only `AppServices
 - [x] A **Repair** nav section: **Fix** (suggestions, the editor, what changes, Apply) and **History** (each
       change, its outcome, Undo). *Fix's badge counts the fixes ticked by default.*
 - [x] Editor on the Fix page rather than Entries: Entries shows what is, Fix shows what will be. An entry's
-      detail on Entries links to it on Fix ("Change it on Fix" picks the row out).
+      detail on Entries links to it on Fix ("Change it on Fix" picks the row out). *A machine entry's detail also
+      has "Move to your user PATH", which stages the move in Fix's editor (or removes the machine copy when your
+      user PATH already has it) and opens Fix on it. Posed as `fix_move_to_user`.*
 - [x] What changes: ratings before → after, each value's diff, each folder's permission change with its
       icacls equivalent (copyable), command resolution changes, and what needs a UAC prompt. *The diff marks
       only the entries outside the longest unchanged run as moved, so a reorder shows the one entry that jumped,

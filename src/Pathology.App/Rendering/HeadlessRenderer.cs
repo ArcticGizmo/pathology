@@ -163,6 +163,13 @@ internal static class HeadlessRenderer
         confirm.Fix.IsConfirming = true;
         Capture(confirm, Path.Combine(outDir, "fix_confirm.png"));
 
+        // "Move to your user PATH" from Entries, on its own: the user PATH gets the copy first.
+        var move = Shell(services, result);
+        foreach (var fix in move.Fix.Fixes) fix.IsSelected = false;
+        move.Entries.Select(Core.Model.PathScope.Machine, 0);
+        move.Entries.Detail!.MoveToUserCommand.Execute(null);
+        Capture(move, Path.Combine(outDir, "fix_move_to_user.png"), height: 1600);
+
         var done = Shell(services, result);
         done.CurrentPage = done.Fix;
         done.Fix.PoseOutcome(PosedRepair.PosedHistory()[0]);

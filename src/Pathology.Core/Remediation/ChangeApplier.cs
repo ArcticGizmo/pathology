@@ -11,7 +11,9 @@ namespace Pathology.Core.Remediation;
 /// yourself, read each write back, tell Explorer, and record what happened step by step.
 /// </summary>
 /// <remarks>
-/// The writers are injected. Only <c>AppServices</c> hands this the real ones, and only from a click on Apply.
+/// The exception is an entry moving from the machine PATH to the user PATH (<see cref="ChangeSet.UserFirst"/>): the
+/// user PATH gets its copy before the UAC prompt, and is put back if the prompt is declined.
+/// <para>The writers are injected. Only <c>AppServices</c> hands this the real ones, and only from a click on Apply.</para>
 /// </remarks>
 public sealed class ChangeApplier(
     IPathValueStore values, IAclStore acls, IEnvironmentBroadcast broadcast, IElevatedRunner elevated,
@@ -51,31 +53,57 @@ public sealed class ChangeApplier(
         history.Save(record);
 
         var steps = new List<StepResult>();
+        var user = changes.ValueFor(PathScope.User);
+
+        // An entry moving down from the machine PATH goes into the user PATH before it leaves the machine one.
+        var first = changes.UserFirst() is { } stage ? new ValueChange { Before = user!.Before, After = stage } : null;
+        if (first is not null)
+        {
+            var step = Steps.WriteValue(values, first);
+            if (step.Status != StepStatus.Applied) return Done(record, [step], changes);
+            steps.Add(step with { Message = "Written before the machine PATH, so an entry moving from it is never missing from both." });
+        }
+
         var batch = ElevatedBatch.Of(changes);
         if (!batch.IsEmpty)
         {
             var result = elevated.Run(batch);
-            if (result.Cancelled)
+            if (result.Cancelled || (result.Error is not null && result.Steps.Count == 0))
+            {
+                var why = result.Cancelled ? "The UAC prompt was declined" : result.Error!.TrimEnd('.');
+                if (first is not null && TakeBack(first) is { } stuck)
+                    return Done(record with { Message = $"{why}. The copy put in your user PATH first couldn't be taken out again ({stuck}): undo it from History." }, steps, changes);
                 return Finish(record with
                 {
-                    Outcome = ChangeOutcome.Cancelled,
-                    Message = "The UAC prompt was declined, so nothing was changed.",
+                    Outcome = result.Cancelled ? ChangeOutcome.Cancelled : ChangeOutcome.Failed,
+                    Message = result.Cancelled ? $"{why}, so nothing was changed." : result.Error,
                     Steps = Skipped(changes),
                 });
-            if (result.Error is not null && result.Steps.Count == 0)
-                return Finish(record with { Outcome = ChangeOutcome.Failed, Message = result.Error, Steps = Skipped(changes) });
+            }
             steps.AddRange(result.Steps);
             if (result.Steps.Any(s => s.Status != StepStatus.Applied))
                 return Done(record with { Message = result.Error }, steps, changes);
         }
 
-        if (changes.ValueFor(PathScope.User) is { } user) steps.Add(Steps.WriteValue(values, user));
+        if (first is null && user is not null) steps.Add(Steps.WriteValue(values, user));
+        else if (first is not null && !Steps.Same(first.After, user!.After))
+            steps.Add(Steps.WriteValue(values, new ValueChange { Before = first.After, After = user.After }));
         foreach (var acl in changes.Acls.Where(a => a.Writes && !a.NeedsAdmin))
         {
             if (steps.Any(s => s.Status == StepStatus.Failed)) { steps.Add(new(acl.Path, StepStatus.Skipped)); continue; }
             steps.Add(Steps.WriteAcl(acls, acl));
         }
         return Done(record, steps, changes);
+    }
+
+    /// <summary>
+    /// Put the user PATH back as it was after its early write, when the machine part never happened (the entry is
+    /// still in the machine PATH, so nothing is lost). Null once it's back, else why it isn't.
+    /// </summary>
+    string? TakeBack(ValueChange first)
+    {
+        var back = Steps.WriteValue(values, new ValueChange { Before = first.After, After = first.Before });
+        return back.Status == StepStatus.Applied ? null : back.Message ?? "it failed";
     }
 
     ChangeRecord Done(ChangeRecord record, List<StepResult> steps, ChangeSet changes)
