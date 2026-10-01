@@ -1,21 +1,29 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Pathology.App.Scanning;
 using Pathology.App.Updates;
+using Pathology.Core.Detection;
+using Pathology.Core.Model;
 using Pathology.Core.Store;
 
 namespace Pathology.App.ViewModels;
 
 /// <summary>
-/// The app shell: owns the pages, the left-nav rows, the update button, and which page is showing.
+/// The app shell: owns the pages, the left-nav rows, the update button, and which page is showing. It's also
+/// the <see cref="INavigator"/> pages use to send you to one another.
 /// </summary>
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, INavigator
 {
-    readonly PageViewModel _health;
-    readonly PageViewModel _findings;
+    readonly HealthViewModel _health;
+    readonly FindingsViewModel _findings;
     readonly PageViewModel _entries;
     readonly PageViewModel _shadowing;
     readonly PageViewModel _learn;
+
+    /// <summary>The scan every page reads.</summary>
+    public ScanSession Session { get; }
 
     /// <summary>Every navigable page — the nav list plus the bottom-pinned Settings and About.</summary>
     public IReadOnlyList<PageViewModel> Pages { get; }
@@ -50,25 +58,14 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>Window title for a session: the product name plus the dev badge.</summary>
     public static string TitleFor() => "PATHology" + AppProfile.DisplaySuffix;
 
-    public MainWindowViewModel(AppServices services)
+    /// <param name="services">The composition root.</param>
+    /// <param name="session">The shared scan. The app starts it; the renderer poses it.</param>
+    /// <param name="checkForUpdates">Run the launch update check (off for the renderer, which poses the button).</param>
+    public MainWindowViewModel(AppServices services, ScanSession session, bool checkForUpdates = true)
     {
-        _health = new PlaceholderPageViewModel("Health", "PATH health",
-            "How safe, correct and tidy this machine's PATH is, each rated by its worst problem.",
-            "Arrives in M4, once the scanner (M1), detectors (M2) and ratings (M3) exist.",
-            [
-                "Security, Correctness and Hygiene, each rated Clean, Low, Medium or High",
-                "What holds each rating where it is, and what it drops to once that's fixed",
-                "The worst findings first",
-                "UAC exposure, length headroom, and what the scan looked at",
-            ]);
-        _findings = new PlaceholderPageViewModel("Findings", "Findings",
-            "Every problem found, worst first, each with what it is, why it matters and how to fix it.",
-            "Arrives in M4.",
-            [
-                "Filters by severity, category, scope and perspective",
-                "Root-cause groups — one drive-root ACL reported once, not per folder",
-                "The ACE or owner that makes a folder writable",
-            ]);
+        Session = session;
+        _health = new HealthViewModel(session, this);
+        _findings = new FindingsViewModel(session, this);
         _entries = new PlaceholderPageViewModel("Entries", "PATH entries",
             "The machine and user PATH, in the order Windows searches them.",
             "Arrives in M4.",
@@ -113,11 +110,41 @@ public partial class MainWindowViewModel : ViewModelBase
         _currentPage = _health;
         _health.IsActive = true;
 
-        _ = CheckForUpdatesAsync();
+        session.PropertyChanged += OnSessionChanged;
+        UpdateNavCounts(session.Current);
+
+        if (checkForUpdates) _ = CheckForUpdatesAsync();
     }
 
     [RelayCommand]
     private void Navigate(PageViewModel page) => CurrentPage = page;
+
+    public void ToFindings(FindingsQuery query)
+    {
+        _findings.Apply(query);
+        CurrentPage = _findings;
+    }
+
+    /// <summary>The Findings page (the renderer selects into it).</summary>
+    public FindingsViewModel Findings => _findings;
+
+    public void ToEntry(PathScope scope, int index) => CurrentPage = _entries;
+
+    public void ToLearn(string topic) => CurrentPage = _learn;
+
+    public void ToCommand(string command) => CurrentPage = _shadowing;
+
+    void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ScanSession.Current)) UpdateNavCounts(Session.Current);
+    }
+
+    /// <summary>Findings' badge counts the High problems; Entries' counts the entries.</summary>
+    void UpdateNavCounts(ScanResult? result)
+    {
+        _findings.NavCount = result?.Health.Count(Severity.High) ?? 0;
+        _entries.NavCount = result?.Snapshot.Entries.Count ?? 0;
+    }
 
     /// <summary>Take the user to About, where the update is downloaded, installed, and the app restarts.
     /// Kicks its check on arrival so the Install button is one click away.</summary>

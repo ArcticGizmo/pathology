@@ -355,10 +355,13 @@ public sealed class LengthHeadroom : IDetector
 
     static string N(int n) => n.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 
+    /// <summary>The PATH a new process gets, or the two stored values joined when that wasn't captured.</summary>
+    public static string EffectivePath(PathSnapshot snapshot) =>
+        snapshot.EffectivePath ?? string.Join(';', new[] { snapshot.MachinePath.Value, snapshot.UserPath.Value }.OfType<string>());
+
     public IEnumerable<Finding> Detect(DetectionContext context)
     {
-        var effective = context.Snapshot.EffectivePath
-                        ?? string.Join(';', new[] { context.Snapshot.MachinePath.Value, context.Snapshot.UserPath.Value }.OfType<string>());
+        var effective = EffectivePath(context.Snapshot);
 
         foreach (var (limit, what) in new[]
                  {

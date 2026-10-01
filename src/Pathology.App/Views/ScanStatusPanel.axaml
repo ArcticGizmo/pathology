@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:scan="clr-namespace:Pathology.App.Scanning"
+             x:Class="Pathology.App.Views.ScanStatusPanel"
+             x:DataType="vm:ScanPageViewModel">
+
+    <!-- What a scan page shows instead of (or above) its content: the checklist while a scan runs, why it
+         failed, or a prompt when nothing has been scanned. Shares the page's DataContext. -->
+    <StackPanel Spacing="14">
+
+        <Border Classes="panel" IsVisible="{Binding IsScanning}">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="phead" Text="SCANNING" />
+                <ItemsControl ItemsSource="{Binding Session.Progress.Steps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="scan:ScanStepViewModel">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="0,4">
+                                <Ellipse Grid.Column="0" Width="10" Height="10" VerticalAlignment="Center"
+                                         Fill="{Binding DotBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="13"
+                                           Foreground="{Binding LabelBrush}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="2" Text="{Binding Detail}" Classes="help"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="help"
+                           Text="Read-only: nothing is written, and network paths are left alone unless you opted in." />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="panel" IsVisible="{Binding HasScanError}">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="phead" Text="THE SCAN FAILED" Foreground="{DynamicResource DangerBrush}" />
+                <SelectableTextBlock Text="{Binding ScanError}" Classes="mono" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+            <Border.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsIdle" />
+                    <Binding Path="!HasScanError" />
+                </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Spacing="8">
+                <TextBlock Classes="phead" Text="NOT SCANNED YET" />
+                <TextBlock Classes="help"
+                           Text="Scan to read this PC's PATH and judge it. It's read-only, and takes a few seconds." />
+            </StackPanel>
+        </Border>
+
+    </StackPanel>
+</UserControl>

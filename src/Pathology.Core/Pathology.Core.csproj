@@ -10,4 +10,9 @@
     <InternalsVisibleTo Include="Pathology.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Learn page's articles, read by LearnLibrary as "Pathology.Learn.<id>.md". -->
+    <EmbeddedResource Include="Learn\Articles\*.md" LogicalName="Pathology.Learn.%(Filename).md" />
+  </ItemGroup>
+
 </Project>

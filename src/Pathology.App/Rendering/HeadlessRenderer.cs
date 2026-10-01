@@ -2,8 +2,10 @@ using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Pathology.App.Changelog;
+using Pathology.App.Scanning;
 using Pathology.App.ViewModels;
 using Pathology.App.Views;
+using Pathology.Core.Capture;
 using Pathology.Core.Changelog;
 
 namespace Pathology.App.Rendering;
@@ -13,9 +15,10 @@ namespace Pathology.App.Rendering;
 /// display. Invoked via <c>pathology render &lt;dir&gt;</c> (by convention <c>./captures/render</c>).
 /// </summary>
 /// <remarks>
-/// <b>Read-only by construction.</b> It builds real view-models over a throwaway temp store, and when a page
-/// needs a state to render interestingly (an update available, from M4 a posed scan) that state is set on
-/// the view-model directly — never produced by running an operation.
+/// <b>Read-only by construction.</b> It builds real view-models over a throwaway temp store and a scan session
+/// that can't scan: every page shows a <see cref="PosedMachines">posed</see> made-up machine handed to the session
+/// directly, never this one. When a page needs a state to render interestingly (an update available, a scan
+/// part-way through) that state is set on the view-model, never produced by running the operation.
 /// </remarks>
 internal static class HeadlessRenderer
 {
@@ -35,16 +38,18 @@ internal static class HeadlessRenderer
             try
             {
                 var services = new AppServices(root);
-                var vm = new MainWindowViewModel(services);
+                var messy = ScanResult.Of(PosedMachines.Messy());
 
+                var vm = Shell(services, messy);
                 foreach (var page in vm.Pages)
                 {
                     vm.CurrentPage = page;
                     Capture(vm, Path.Combine(outDir, $"main_{page.Title.ToLowerInvariant()}.png"));
                 }
 
+                RenderHealthStates(outDir, services);
                 RenderChangelog(outDir);
-                RenderUpdateButton(outDir, services);
+                RenderUpdateButton(outDir, services, messy);
             }
             finally
             {
@@ -59,6 +64,31 @@ internal static class HeadlessRenderer
             Console.Error.WriteLine($"headless render failed: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>A session that refuses to scan: the renderer only ever shows posed results.</summary>
+    static ScanSession PosedSession(ScanResult? result)
+    {
+        var session = new ScanSession((_, _) => throw new InvalidOperationException("the renderer never scans"));
+        if (result is not null) session.Show(result);
+        return session;
+    }
+
+    static MainWindowViewModel Shell(AppServices services, ScanResult? result) =>
+        new(services, PosedSession(result), checkForUpdates: false);
+
+    /// <summary>Health when everything is clean, part-way through a scan, and before any scan.</summary>
+    static void RenderHealthStates(string outDir, AppServices services)
+    {
+        Capture(Shell(services, ScanResult.Of(PosedMachines.Clean())), Path.Combine(outDir, "health_clean.png"));
+
+        // Part-way through: the checklist is posed from a progress report; nothing runs.
+        var scanning = Shell(services, null);
+        scanning.Session.IsScanning = true;
+        scanning.Session.Progress.Apply(new CaptureProgress(CaptureStep.ProbingDirectories, 17, 41));
+        Capture(scanning, Path.Combine(outDir, "health_scanning.png"));
+
+        Capture(Shell(services, null), Path.Combine(outDir, "health_idle.png"));
     }
 
     /// <summary>The "what's new" window (the post-update popup / About viewer), over the real changelog.</summary>
@@ -78,9 +108,10 @@ internal static class HeadlessRenderer
     /// build is never Velopack-installed, so a real check reports "not applicable" and the button hides. The
     /// version is set directly — a read-only pose, nothing is downloaded or applied.
     /// </summary>
-    static void RenderUpdateButton(string outDir, AppServices services)
+    static void RenderUpdateButton(string outDir, AppServices services, ScanResult result)
     {
-        var vm = new MainWindowViewModel(services) { AvailableVersion = "0.2.0" };
+        var vm = Shell(services, result);
+        vm.AvailableVersion = "0.2.0";
         Capture(vm, Path.Combine(outDir, "update_available.png"));
     }
 

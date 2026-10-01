@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Pathology.App.Changelog;
+using Pathology.App.Scanning;
 using Pathology.App.Theming;
 using Pathology.App.ViewModels;
 using Pathology.App.Views;
@@ -23,14 +24,19 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = new AppServices();
+            var session = new ScanSession((progress, cancel) => services.Capture(progress, cancel));
             var main = new MainWindow
             {
-                DataContext = new MainWindowViewModel(services),
+                DataContext = new MainWindowViewModel(services, session),
                 Title = MainWindowViewModel.TitleFor(),
             };
 
             desktop.MainWindow = main;
+            desktop.Exit += (_, _) => services.Dispose();
             MaybeShowChangelog(services, main);
+
+            // The one place the real machine is scanned from the UI (read-only). Every page shares the result.
+            if (services.Settings.Get().ScanOnLaunch) _ = session.ScanAsync();
         }
         base.OnFrameworkInitializationCompleted();
     }

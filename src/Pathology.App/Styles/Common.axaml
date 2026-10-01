@@ -99,6 +99,45 @@
         <Setter Property="TextBlock.TextDecorations" Value="Underline" />
     </Style>
 
+    <!-- .row is a clickable list row: no chrome, a soft hover, content stretched across. .row.selected marks the
+         row a master/detail page is showing. -->
+    <Style Selector="Button.row">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+    </Style>
+    <Style Selector="Button.row:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+    </Style>
+    <Style Selector="Button.row.selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemActiveBgBrush}" />
+    </Style>
+
+    <!-- A filter chip: a toggle that reads as a pill, accented when on. -->
+    <Style Selector="ToggleButton.chip">
+        <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="11,4" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ButtonNeutralHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    </Style>
+
     <!-- Status text colouring, driven by a bound class. :is() for the same reason as .mono above —
          status lines carry error text, which is the thing users most want to copy. -->
     <Style Selector=":is(TextBlock).status.ok"><Setter Property="Foreground" Value="{DynamicResource OkBrush}" /></Style>
