@@ -15,6 +15,11 @@
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         </Style>
+        <!-- What an entry expands to, under the stored text: lighter, so the stored text leads. -->
+        <Style Selector=":is(TextBlock).mono.expansion">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="32,36,32,24">
@@ -23,7 +28,7 @@
             <StackPanel Grid.Column="0" Spacing="3">
                 <TextBlock Classes="pagetitle" Text="PATH entries" />
                 <TextBlock Classes="help"
-                           Text="The machine PATH, then yours: the order Windows searches them. The squares show who can add files to each folder." />
+                           Text="The machine PATH, then yours: the order Windows searches them, as stored, with what a %VARIABLE% expands to beneath. The squares show who can add files to each folder." />
             </StackPanel>
             <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
                     Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
@@ -39,8 +44,6 @@
         </views:ScanStatusPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12" IsVisible="{Binding HasResult}">
-            <ToggleButton Classes="chip" Content="Expanded" IsChecked="{Binding ShowExpanded}"
-                          ToolTip.Tip="Show each entry with its %VARIABLES% expanded, or exactly as stored" />
             <ToggleButton Classes="chip" Content="Highlight defects" IsChecked="{Binding ShowDefects}"
                           ToolTip.Tip="Pick out quotes, stray spaces, doubled backslashes and forward slashes" />
         </StackPanel>
@@ -83,6 +86,9 @@
                                                         <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,10,0">
                                                             <controls:DefectTextBlock Source="{Binding Text}" Classes="mono"
                                                                                       Highlight="{Binding $parent[UserControl].((vm:EntriesViewModel)DataContext).ShowDefects}" />
+                                                            <controls:DefectTextBlock Source="{Binding Expanded}" Classes="mono expansion" Highlight="False"
+                                                                                      IsVisible="{Binding HasExpanded}"
+                                                                                      ToolTip.Tip="What it expands to" />
                                                             <TextBlock Text="{Binding Status}" FontSize="10.5"
                                                                        Foreground="{Binding StatusBrush}"
                                                                        IsVisible="{Binding HasStatus}" />
@@ -134,7 +140,7 @@
 
                         <StackPanel Spacing="6">
                             <TextBlock Classes="phead" Text="{Binding Heading}" />
-                            <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" FontSize="13.5" />
+                            <controls:CharWrapTextBlock Source="{Binding Raw}" Classes="mono" FontSize="13.5" />
                             <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{Binding StatusBrush}" />
                             <StackPanel Orientation="Horizontal" Spacing="16">
                                 <Button Classes="link" FontSize="12" Content="Change it on Fix"
@@ -146,8 +152,8 @@
                         </StackPanel>
 
                         <StackPanel Spacing="4" IsVisible="{Binding ExpandedDiffers}">
-                            <TextBlock Classes="phead" Text="AS STORED" />
-                            <controls:CharWrapTextBlock Source="{Binding Raw}" Classes="mono" />
+                            <TextBlock Classes="phead" Text="EXPANDS TO" />
+                            <controls:CharWrapTextBlock Source="{Binding Expanded}" Classes="mono" />
                         </StackPanel>
 
                         <StackPanel Spacing="6">

@@ -52,7 +52,7 @@ every user from `C:\`.
 - [ ] `C:\Windows\system32`: hollow under *You* and *Std*, grey under *Elev.* and *SYSTEM*.
 - [ ] `%NVM_SYMLINK%` row says the variable isn't expanded; the missing folders say "missing".
 - [ ] The `…\nvm\\.nodejs` entry shows the doubled backslash highlighted; toggling *Highlight defects* clears it.
-- [ ] Toggling *Expanded* shows the stored text.
+- [ ] Each row shows the stored text; one using a `%VARIABLE%` has what it expands to beneath, in lighter text.
 
 ### Shadowing
 - [ ] `where` runs `C:\Windows\system32\where.exe`.
@@ -111,8 +111,12 @@ can restore without PATHology. From a normal prompt:
 Have a `cmd` window open throughout, and run `echo %PATH%` in a **new** one after each step.
 
 ### Dry run
-- [ ] Fix lists the fixes, recommended ones ticked; the ratings show where each category would land.
+- [ ] Fix shows each fix ticked on the line it changes (recommended ones ticked), Windows-first on the machine
+      PATH heading; the ratings show where each category would land. Removed lines are struck through in place.
+- [ ] The C:\ lock-down shows on each folder it covers; unticking it on one line unticks it on all of them.
 - [ ] Untick everything: "What changes" says nothing yet, and Apply is disabled.
+- [ ] Only the line you click shows the ↑ ↓ / To user / Edit / Remove buttons. Remove one: it stays struck
+      through with "Put it back", which restores it.
 - [ ] Tick *Search the Windows folders first*: `where` (and anything else C:\scripts shadows) shows under
       "Commands that would run something else". Untick it again.
 - [ ] The VS Code / profile entries offer **Move … to your user PATH**, never a lock-down.

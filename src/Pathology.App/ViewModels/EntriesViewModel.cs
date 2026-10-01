@@ -28,9 +28,6 @@ public sealed partial class EntriesViewModel : ScanPageViewModel
 
     [ObservableProperty] private IReadOnlyList<EntrySectionViewModel> _sections = [];
 
-    /// <summary>Show each entry expanded (true) or exactly as stored (false).</summary>
-    [ObservableProperty] private bool _showExpanded = true;
-
     /// <summary>Pick out quotes, stray spaces, doubled and forward slashes in the text.</summary>
     [ObservableProperty] private bool _showDefects = true;
 
@@ -41,11 +38,6 @@ public sealed partial class EntriesViewModel : ScanPageViewModel
     [ObservableProperty] private EntryDetailViewModel? _detail;
 
     public bool HasSelection => Selected is not null;
-
-    partial void OnShowExpandedChanged(bool value)
-    {
-        foreach (var row in Sections.SelectMany(s => s.Rows)) row.ShowExpanded = value;
-    }
 
     partial void OnSelectedChanged(EntryRowViewModel? oldValue, EntryRowViewModel? newValue)
     {
@@ -143,7 +135,6 @@ public sealed partial class EntryRowViewModel : ViewModelBase
     {
         Entry = entry;
         _owner = owner;
-        _showExpanded = owner.ShowExpanded;
 
         var resolved = result.Context.Resolve(entry);
         var final = resolved.Final;
@@ -163,12 +154,14 @@ public sealed partial class EntryRowViewModel : ViewModelBase
 
     [ObservableProperty] private bool _isSelected;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Text))]
-    private bool _showExpanded;
-
     public string Position => $"#{Entry.Index + 1}";
-    public string Text => ShowExpanded ? Entry.Expanded : Entry.Raw;
+
+    /// <summary>The entry exactly as stored, so a <c>%VARIABLE%</c> is always in sight.</summary>
+    public string Text => Entry.Raw;
+
+    /// <summary>What it expands to, shown under it only when that differs.</summary>
+    public string Expanded => Entry.Expanded;
+    public bool HasExpanded => !string.Equals(Entry.Raw, Entry.Expanded, StringComparison.Ordinal);
 
     public string Status { get; }
     public IBrush StatusBrush { get; }

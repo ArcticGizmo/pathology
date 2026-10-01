@@ -2,13 +2,18 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Pathology.App.Controls;
 using Pathology.App.ViewModels;
 
 namespace Pathology.App.Views;
 
 public partial class FixView : UserControl
 {
-    public FixView() => InitializeComponent();
+    public FixView()
+    {
+        InitializeComponent();
+        KeepSelectionVisible.Attach(this, nameof(FixViewModel.ArrivedRow), vm => ((FixViewModel)vm).ArrivedRow);
+    }
 
     /// <summary>Put the lock-downs on the clipboard as icacls commands, to read or run by hand.</summary>
     async void OnCopyCommands(object? sender, RoutedEventArgs e)

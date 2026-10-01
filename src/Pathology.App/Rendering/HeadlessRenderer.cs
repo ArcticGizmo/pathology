@@ -148,13 +148,14 @@ internal static class HeadlessRenderer
         vm.Fix.Fixes.Single(f => f.Fix.Id == RemediationPlanner.WindowsFirstId).IsSelected = true;
         Capture(vm, Path.Combine(outDir, "fix_windows_first.png"));
 
-        var user = vm.Fix.Sections[1].Rows;
-        user[^1].RemoveCommand.Execute(null);
-        vm.Fix.Sections[1].Rows[0].MoveUpCommand.Execute(null);
-        vm.Fix.Sections[0].Rows[^1].MoveScopeCommand.Execute(null);
+        vm.Fix.Sections[1].LiveRows[^1].RemoveCommand.Execute(null);
+        vm.Fix.Sections[1].LiveRows[1].MoveUpCommand.Execute(null);
+        vm.Fix.Sections[0].LiveRows[^1].MoveScopeCommand.Execute(null);
         vm.Fix.NewEntryText = @"C:\Users\you\AppData\Local\Programs\tool\bin";
         vm.Fix.AddCommand.Execute(null);
-        vm.Fix.Sections[1].Rows[0].BeginEditCommand.Execute(null);
+        // Picked out, so its buttons show, and being edited.
+        vm.Fix.Sections[1].LiveRows[0].SelectCommand.Execute(null);
+        vm.Fix.Sections[1].LiveRows[0].BeginEditCommand.Execute(null);
         // Tall, so the editor below the fixes is in the picture too.
         Capture(vm, Path.Combine(outDir, "fix_edited.png"), height: 2300);
 

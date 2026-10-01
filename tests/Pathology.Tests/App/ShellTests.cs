@@ -57,7 +57,12 @@ public class ShellTests
         Assert.Same(vm.Fix, vm.CurrentPage);
         var moved = Assert.Single(vm.Fix.Sections[1].Rows, r => r.IsHighlighted);
         Assert.Equal(@"C:\Tools", moved.Entry.Text);
-        Assert.DoesNotContain(vm.Fix.Sections[0].Rows, r => r.Entry.Text == @"C:\Tools");
+        Assert.DoesNotContain(vm.Fix.Sections[0].LiveRows, r => r.Entry.Text == @"C:\Tools");
+        // It stays where it was in the machine PATH, struck through, saying where it went.
+        var gone = Assert.Single(vm.Fix.Sections[0].Rows, r => r.IsGhost);
+        Assert.Equal("moves to the user PATH", gone.Status);
+        Assert.True(gone.CanPutBack);
+        Assert.True(moved.IsSelected);
         Assert.NotNull(vm.Fix.Changes.UserFirst());
         Assert.Contains("written first", vm.Fix.Plan!.AdminLine);
     }

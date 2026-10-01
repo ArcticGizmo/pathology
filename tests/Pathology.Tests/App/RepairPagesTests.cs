@@ -136,6 +136,77 @@ public class FixViewModelTests
     }
 
     [Fact]
+    public void Each_fix_shows_on_the_lines_it_changes_and_value_fixes_on_the_heading()
+    {
+        var page = Page(out _);
+        var machine = page.Sections[0];
+
+        var tools = machine.LiveRows.Single(r => r.Entry.Text == @"C:\Tools");
+        Assert.Contains(tools.Fixes, t => t.Title == @"Lock down C:\Tools");
+        Assert.Contains(machine.ValueFixes, t => t.Fix.Fix.Id == RemediationPlanner.WindowsFirstId);
+        Assert.DoesNotContain(machine.Rows.SelectMany(r => r.Fixes), t => t.Fix.Fix.Id == RemediationPlanner.WindowsFirstId);
+
+        // A lock-down of two folders shows on both lines, says so, and is one tick.
+        var python = machine.LiveRows.Where(r => r.Entry.Text.StartsWith(@"C:\Python312", StringComparison.Ordinal)).ToList();
+        var shared = python[0].Fixes.Single(t => t.Title.Contains("inherit", StringComparison.Ordinal));
+        Assert.Same(shared.Fix, python[1].Fixes.Single(t => t.Title.Contains("inherit", StringComparison.Ordinal)).Fix);
+        Assert.Contains("2 lines", shared.Meta);
+
+        // Every fix shows somewhere.
+        var shown = page.Sections.SelectMany(s => s.Rows.SelectMany(r => r.Fixes).Concat(s.ValueFixes)).Select(t => t.Fix).ToHashSet();
+        Assert.All(page.Fixes, f => Assert.Contains(f, shown));
+    }
+
+    [Fact]
+    public void A_line_a_fix_removes_stays_struck_through_with_its_tick()
+    {
+        var page = Page(out _);
+        var gone = page.Sections[0].Rows.Single(r => r.Entry.Text == @"C:\OldApp\bin");
+        Assert.True(gone.IsGhost);
+        Assert.Equal("removed", gone.Status);
+        Assert.False(gone.CanPutBack);
+
+        gone.Fixes.Single().Fix.IsSelected = false;
+
+        var back = page.Sections[0].Rows.Single(r => r.Entry.Text == @"C:\OldApp\bin");
+        Assert.False(back.IsGhost);
+        Assert.Contains(back.Fixes, t => !t.Fix.IsSelected);
+    }
+
+    [Fact]
+    public void A_line_you_removed_can_be_put_back_and_only_the_picked_line_shows_its_buttons()
+    {
+        var page = Page(out _);
+        foreach (var fix in page.Fixes) fix.IsSelected = false;
+        var git = page.Sections[0].LiveRows.First(r => r.Entry.Text == @"C:\Program Files\Git\cmd");
+        Assert.False(git.ShowTools);
+
+        git.SelectCommand.Execute(null);
+        Assert.True(git.ShowTools);
+        Assert.Single(page.Sections.SelectMany(s => s.Rows), r => r.ShowTools);
+
+        git.RemoveCommand.Execute(null);
+        var gone = page.Sections[0].Rows.First(r => r.IsGhost);
+        Assert.True(gone.CanPutBack);
+        Assert.False(gone.ShowTools);
+        gone.PutBackCommand.Execute(null);
+
+        Assert.True(page.Changes.IsEmpty);
+        Assert.DoesNotContain(page.Sections[0].Rows, r => r.IsGhost);
+    }
+
+    [Fact]
+    public void A_line_shows_what_it_expands_to_when_that_differs()
+    {
+        var page = Page(out _);
+        var user = page.Sections[1].LiveRows;
+
+        Assert.Equal(@"C:\Users\you\AppData\Local\Microsoft\WindowsApps",
+            user.Single(r => r.Entry.Text.StartsWith("%USERPROFILE%", StringComparison.Ordinal)).Expanded);
+        Assert.False(user.Single(r => r.Entry.Text == @"C:\Users\you\.dotnet\tools").HasExpanded);
+    }
+
+    [Fact]
     public void Removing_and_editing_an_entry_land_in_the_value()
     {
         var page = Page(out _);

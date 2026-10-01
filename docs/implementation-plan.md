@@ -410,6 +410,8 @@ the page, each pane scrolling on its own.*
       SYSTEM grey (expected for an administrator). The detail pane has every captured fact and, per
       perspective, the rights and the ACEs granting them.*
 - [x] Toggle between raw and expanded, and to show hygiene defects inline (highlighted characters).
+      *Changed 2026-10-01: no raw/expanded toggle. Each row shows the text as stored, with what it expands to in
+      lighter text beneath when that differs, so a `%VARIABLE%` is always in sight.*
       *`DefectSegmenter` picks out quotes, edge whitespace (shown as `·`), doubled backslashes other than a UNC
       prefix, and forward slashes.*
 - [x] Uses `CharWrapTextBlock` (ported) for long paths. *With a `Prose` mode that breaks only after `\`, for
@@ -578,6 +580,13 @@ writers sit in `Pathology.Windows` behind Core interfaces, and only `AppServices
       detail on Entries links to it on Fix ("Change it on Fix" picks the row out). *A machine entry's detail also
       has "Move to your user PATH", which stages the move in Fix's editor (or removes the machine copy when your
       user PATH already has it) and opens Fix on it. Posed as `fix_move_to_user`.*
+- [x] *Changed 2026-10-01: fixes per line.* The separate fixes list was too much to take in, so Fix is one panel: the
+      PATH as it would be, each line with the ticks of the fixes that change it (a lock-down covering several
+      folders shows on each, "2 lines", one tick). Fixes about a whole value (its kind, Windows first, putting
+      Windows' folders back) sit on the scope's heading. A line that's gone stays where it was, struck through,
+      saying whether it was removed or moves to the other scope, so its fix can be unticked there; one you took out
+      by hand has "Put it back". The editor's buttons show only on the line you click. Lines show the text as
+      stored with the expansion beneath, as Entries does. Arriving from Entries scrolls to the line.
 - [x] What changes: ratings before → after, each value's diff, each folder's permission change with its
       icacls equivalent (copyable), command resolution changes, and what needs a UAC prompt. *The diff marks
       only the entries outside the longest unchanged run as moved, so a reorder shows the one entry that jumped,

@@ -9,10 +9,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Fix** — PATHology now fixes what it finds, not just tuts at it. Tick the fixes (the safe ones come
-  pre-ticked), nudge the PATH around by hand if you like, and see exactly what would change before anything
-  does: the ratings before and after, every entry added, removed or moved, every folder's new permissions, and
-  every command that would start running something else.
+- **Fix** — PATHology now fixes what it finds, not just tuts at it. Your PATH as it would be, each line with
+  the fixes that change it (the safe ones come pre-ticked). Removed lines stay put, struck through, so you can
+  change your mind where you made it. Click a line to nudge it around by hand, and see exactly what would change
+  before anything does: the ratings before and after, every entry added, removed or moved, every folder's new
+  permissions, and every command that would start running something else.
 - **Folder lock-downs** — writable PATH folders get their permissions trimmed to read & execute for everyone
   but administrators, applied by the app itself, with the equivalent icacls commands on offer to copy.
   A folder inside your own profile gets moved to your user PATH instead, because locking you out of your own
@@ -33,8 +34,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   UAC exposure, how close PATH is to its length limits, and what the scan looked at.
 - **Findings** — every problem worst first, one row per cause, filterable, each with what, why, how to fix
   it and the permission that makes it possible. Copy details pastes it into a ticket.
-- **Entries** — both PATHs in search order, with who can write each folder from four points of view, and
-  stray quotes and spaces picked out where they hide.
+- **Entries** — both PATHs in search order, exactly as stored with what each `%VARIABLE%` expands to beneath,
+  who can write each folder from four points of view, and stray quotes and spaces picked out where they hide.
 - **Shadowing** — type a command, see which file runs and which ones it hides. Windows commands that
   something else is already answering for are listed, which is usually news.
 - **Learn** — seven short articles on how Windows really finds commands and DLLs, linked from the findings

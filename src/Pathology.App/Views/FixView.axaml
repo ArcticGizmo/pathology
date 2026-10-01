@@ -31,14 +31,49 @@
             <Setter Property="Background" Value="{DynamicResource ButtonNeutralHoverBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
         </Style>
+
+        <!-- A line of the PATH: hover shows it can be picked out; picked out (or arrived at) is filled. -->
         <Style Selector="Border.draftrow">
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="10,6" />
             <Setter Property="Margin" Value="0,1" />
             <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="Border.draftrow.highlighted">
+        <Style Selector="Border.draftrow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+        </Style>
+        <Style Selector="Border.draftrow.highlighted, Border.draftrow.selected">
             <Setter Property="Background" Value="{DynamicResource NavItemActiveBgBrush}" />
+        </Style>
+
+        <!-- The line's text, as a click target that picks it out. -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.pick:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.pick:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- What an entry expands to, under it; and a line that's gone, struck through. -->
+        <Style Selector=":is(TextBlock).mono.expansion">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
+        <Style Selector=":is(TextBlock).mono.gone">
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+        </Style>
+
+        <!-- A fix's tick box on a line: small, so the PATH stays the thing you read. -->
+        <Style Selector="CheckBox.tick">
+            <Setter Property="MinHeight" Value="22" />
+            <Setter Property="Padding" Value="6,0,0,0" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
     </UserControl.Styles>
 
@@ -48,7 +83,7 @@
             <StackPanel Grid.Column="0" Spacing="3">
                 <TextBlock Classes="pagetitle" Text="Fix" />
                 <TextBlock Classes="help"
-                           Text="Pick the fixes, adjust the PATH if you like, and check what changes. Nothing is written until you apply, and a backup is kept so you can undo it from History." />
+                           Text="Each line shows the fixes that change it. Tick what you want, click a line to move, edit or remove it, and check what changes. Nothing is written until you apply, and a backup is kept so you can undo it from History." />
             </StackPanel>
             <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
                     Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
@@ -65,140 +100,156 @@
 
         <Grid Grid.Row="2" ColumnDefinitions="1.15*,*" ColumnSpacing="14" IsVisible="{Binding HasResult}">
 
-            <!-- Left: the fixes, then the PATH as it would be. -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="14" Margin="0,0,4,0">
+            <!-- Left: the PATH as it would be, each line with its fixes. -->
+            <Border Grid.Column="0" Classes="panel" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="10" Margin="14,14">
+                        <Grid ColumnDefinitions="*,Auto" Margin="6,0">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Classes="phead" Text="THE PATH AS IT WOULD BE" />
+                                <TextBlock Classes="help" Text="{Binding FixesHeading}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="link" VerticalAlignment="Top" FontSize="12"
+                                    Content="Reset my edits" Command="{Binding ResetEditsCommand}" IsVisible="{Binding HasEdits}" />
+                        </Grid>
 
-                    <Border Classes="panel" Padding="14,14">
-                        <StackPanel Spacing="8">
-                            <TextBlock Classes="phead" Text="{Binding FixesHeading}" Margin="6,0" />
-                            <TextBlock Classes="help" Margin="6,0" IsVisible="{Binding !HasFixes}"
-                                       Text="Nothing here has an automatic fix. You can still edit the PATH below." />
-                            <ItemsControl ItemsSource="{Binding Fixes}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:FixRowViewModel">
-                                        <Border Classes="draftrow" Padding="6,6">
-                                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Top"
-                                                          Margin="0,-4,0,0" AutomationProperties.Name="{Binding Title}" />
-                                                <Ellipse Grid.Column="1" Width="8" Height="8" VerticalAlignment="Top"
-                                                         Margin="0,6,0,0" Fill="{Binding SeverityBrush}" />
-                                                <StackPanel Grid.Column="2" Spacing="2">
-                                                    <controls:CharWrapTextBlock Source="{Binding Title}" Prose="True" FontSize="13"
-                                                                                Foreground="{DynamicResource FgBrush}" />
-                                                    <controls:CharWrapTextBlock Source="{Binding Problem}" Prose="True" Classes="help" FontSize="11.5"
-                                                                                Foreground="{DynamicResource MutedBrush}" />
-                                                    <controls:CharWrapTextBlock Source="{Binding Note}" Prose="True" FontSize="11.5"
-                                                                                Foreground="{DynamicResource WarnBrush}"
-                                                                                IsVisible="{Binding HasNote}" />
-                                                    <TextBlock Text="{Binding Meta}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Classes="panel" Padding="14,14">
-                        <StackPanel Spacing="10">
-                            <Grid ColumnDefinitions="*,Auto" Margin="6,0">
-                                <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Classes="phead" Text="THE PATH AS IT WOULD BE" />
-                                    <TextBlock Classes="help" Text="The fixes above, plus any edits you make here. Search order, top to bottom." />
-                                </StackPanel>
-                                <Button Grid.Column="1" Classes="link" VerticalAlignment="Top" FontSize="12"
-                                        Content="Reset my edits" Command="{Binding ResetEditsCommand}" IsVisible="{Binding HasEdits}" />
-                            </Grid>
-
-                            <ItemsControl ItemsSource="{Binding Sections}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:DraftSectionViewModel">
-                                        <StackPanel Margin="0,0,0,12">
-                                            <Grid ColumnDefinitions="*,Auto" Margin="6,4,6,4">
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                                                    <TextBlock Classes="phead" Text="{Binding Heading}" VerticalAlignment="Center" />
-                                                    <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                                <Button Grid.Column="1" Classes="link" FontSize="11.5" Content="Recommended order"
-                                                        ToolTip.Tip="Windows folders first, then folders only administrators can write, then writable ones"
-                                                        Command="{Binding $parent[UserControl].((vm:FixViewModel)DataContext).RecommendedOrderCommand}"
-                                                        CommandParameter="{Binding}" IsVisible="{Binding HasRows}" />
-                                            </Grid>
-                                            <TextBlock Classes="help" Margin="6,2" Text="Empty." IsVisible="{Binding !HasRows}" />
-                                            <ItemsControl ItemsSource="{Binding Rows}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate x:DataType="vm:DraftRowViewModel">
-                                                        <Border Classes="draftrow" Classes.highlighted="{Binding IsHighlighted}">
-                                                            <Grid ColumnDefinitions="34,*,Auto">
-                                                                <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="help"
-                                                                           VerticalAlignment="Top" Margin="0,2,0,0" />
-                                                                <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,10,0">
-                                                                    <controls:CharWrapTextBlock Source="{Binding Text}" Classes="mono"
-                                                                                                IsVisible="{Binding !IsEditing}" />
-                                                                    <TextBox Text="{Binding EditText}" FontFamily="Cascadia Code, Consolas, monospace"
-                                                                             FontSize="12" IsVisible="{Binding IsEditing}"
-                                                                             AutomationProperties.Name="Entry text">
-                                                                        <TextBox.KeyBindings>
-                                                                            <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
-                                                                            <KeyBinding Gesture="Escape" Command="{Binding CancelEditCommand}" />
-                                                                        </TextBox.KeyBindings>
-                                                                    </TextBox>
-                                                                    <controls:CharWrapTextBlock Source="{Binding Status}" Prose="True" FontSize="10.5"
-                                                                                                Foreground="{Binding StatusBrush}"
-                                                                                                IsVisible="{Binding HasStatus}" />
-                                                                </StackPanel>
-                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Top">
-                                                                    <Button Classes="tool" Content="↑" ToolTip.Tip="Search it earlier" Command="{Binding MoveUpCommand}" />
-                                                                    <Button Classes="tool" Content="↓" ToolTip.Tip="Search it later" Command="{Binding MoveDownCommand}" />
-                                                                    <Button Classes="tool" Content="{Binding MoveLabel}" ToolTip.Tip="{Binding MoveTip}" Command="{Binding MoveScopeCommand}" />
-                                                                    <Button Classes="tool" Content="Edit" Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}" />
-                                                                    <Button Classes="tool" Content="Save" Command="{Binding SaveEditCommand}" IsVisible="{Binding IsEditing}" />
-                                                                    <Button Classes="tool" Content="×" ToolTip.Tip="Remove it" Command="{Binding RemoveCommand}" />
-                                                                </StackPanel>
-                                                            </Grid>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                            <StackPanel Margin="40,4,6,0" Spacing="2" IsVisible="{Binding HasRemoved}">
-                                                <TextBlock Classes="help" Text="Taken out:" />
-                                                <ItemsControl ItemsSource="{Binding Removed}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="x:String">
-                                                            <controls:CharWrapTextBlock Source="{Binding}" Classes="mono" FontSize="11.5"
-                                                                                        Foreground="{DynamicResource MutedBrush}" />
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Sections}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DraftSectionViewModel">
+                                    <StackPanel Margin="0,0,0,12" Spacing="2">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="6,4,6,2">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Classes="phead" Text="{Binding Heading}" VerticalAlignment="Center" />
+                                                <TextBlock Classes="help" Text="{Binding Summary}" VerticalAlignment="Center" />
                                             </StackPanel>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                            <Button Grid.Column="1" Classes="link" FontSize="11.5" Content="Recommended order"
+                                                    ToolTip.Tip="Windows folders first, then folders only administrators can write, then writable ones"
+                                                    Command="{Binding $parent[UserControl].((vm:FixViewModel)DataContext).RecommendedOrderCommand}"
+                                                    CommandParameter="{Binding}" IsVisible="{Binding HasRows}" />
+                                        </Grid>
 
-                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="6,0">
-                                <TextBox Grid.Column="0" Text="{Binding NewEntryText}" PlaceholderText="Add a folder, e.g. C:\Program Files\Tool\bin"
-                                         FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
-                                         AutomationProperties.Name="New entry">
-                                    <TextBox.KeyBindings>
-                                        <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
-                                    </TextBox.KeyBindings>
-                                </TextBox>
-                                <ToggleButton Grid.Column="1" Classes="chip" IsChecked="{Binding NewEntryInUser}" VerticalAlignment="Center"
-                                              ToolTip.Tip="On: your user PATH. Off: the machine PATH (needs admin)">
-                                    <Panel>
-                                        <TextBlock Text="to my user PATH" IsVisible="{Binding NewEntryInUser}" />
-                                        <TextBlock Text="to the machine PATH" IsVisible="{Binding !NewEntryInUser}" />
-                                    </Panel>
-                                </ToggleButton>
-                                <Button Grid.Column="2" Classes="secondary" Content="Add" Command="{Binding AddCommand}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+                                        <!-- Fixes about the whole value. -->
+                                        <ItemsControl ItemsSource="{Binding ValueFixes}" IsVisible="{Binding HasValueFixes}" Margin="10,0,6,4">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:FixTickViewModel">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" ToolTip.Tip="{Binding Tip}">
+                                                        <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center"
+                                                                 Fill="{Binding SeverityBrush}" />
+                                                        <CheckBox Grid.Column="1" Classes="tick" IsChecked="{Binding Fix.IsSelected}"
+                                                                  AutomationProperties.Name="{Binding Title}">
+                                                            <TextBlock TextWrapping="Wrap">
+                                                                <Run Text="{Binding Title}" Foreground="{DynamicResource FgBrush}" />
+                                                                <Run Text="{Binding Meta}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}" />
+                                                            </TextBlock>
+                                                        </CheckBox>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Classes="help" Margin="10,2" Text="Empty." IsVisible="{Binding !HasRows}" />
+                                        <ItemsControl ItemsSource="{Binding Rows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:DraftRowViewModel">
+                                                    <Border Classes="draftrow" Classes.highlighted="{Binding IsHighlighted}"
+                                                            Classes.selected="{Binding IsSelected}">
+                                                        <StackPanel Spacing="3">
+                                                            <!-- The line itself: click to pick it out. -->
+                                                            <Button Classes="pick" Command="{Binding SelectCommand}" IsVisible="{Binding !IsEditing}">
+                                                                <Grid ColumnDefinitions="34,*">
+                                                                    <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="help"
+                                                                               VerticalAlignment="Top" Margin="0,1,0,0" />
+                                                                    <StackPanel Grid.Column="1" Spacing="2">
+                                                                        <controls:DefectTextBlock Source="{Binding Text}" Classes="mono"
+                                                                                                  Classes.gone="{Binding IsGhost}" Highlight="{Binding !IsGhost}" />
+                                                                        <controls:DefectTextBlock Source="{Binding Expanded}" Classes="mono expansion"
+                                                                                                  Highlight="False" IsVisible="{Binding HasExpanded}" />
+                                                                        <TextBlock Text="{Binding Status}" FontSize="10.5" TextWrapping="Wrap"
+                                                                                   Foreground="{Binding StatusBrush}" IsVisible="{Binding HasStatus}" />
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Button>
+                                                            <Grid ColumnDefinitions="34,*" IsVisible="{Binding IsEditing}">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="help"
+                                                                           VerticalAlignment="Center" />
+                                                                <TextBox Grid.Column="1" Text="{Binding EditText}"
+                                                                         FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                                                                         AutomationProperties.Name="Entry text">
+                                                                    <TextBox.KeyBindings>
+                                                                        <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+                                                                        <KeyBinding Gesture="Escape" Command="{Binding CancelEditCommand}" />
+                                                                    </TextBox.KeyBindings>
+                                                                </TextBox>
+                                                            </Grid>
+
+                                                            <!-- The fixes that change it. -->
+                                                            <ItemsControl ItemsSource="{Binding Fixes}" IsVisible="{Binding HasFixes}" Margin="34,0,0,0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:FixTickViewModel">
+                                                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" ToolTip.Tip="{Binding Tip}">
+                                                                            <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center"
+                                                                                     Fill="{Binding SeverityBrush}" />
+                                                                            <CheckBox Grid.Column="1" Classes="tick" IsChecked="{Binding Fix.IsSelected}"
+                                                                                      AutomationProperties.Name="{Binding Title}">
+                                                                                <TextBlock TextWrapping="Wrap">
+                                                                                    <Run Text="{Binding Title}" Foreground="{DynamicResource FgBrush}" />
+                                                                                    <Run Text="{Binding Meta}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}" />
+                                                                                </TextBlock>
+                                                                            </CheckBox>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+
+                                                            <!-- Once picked out: what its fixes cost, and the editor's buttons. -->
+                                                            <ItemsControl ItemsSource="{Binding Notes}" IsVisible="{Binding ShowNotes}" Margin="47,0,0,0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="x:String">
+                                                                        <controls:CharWrapTextBlock Source="{Binding}" Prose="True" FontSize="11.5"
+                                                                                                    Foreground="{DynamicResource WarnBrush}" />
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <StackPanel Orientation="Horizontal" Spacing="3" Margin="34,2,0,2" IsVisible="{Binding ShowTools}">
+                                                                <Button Classes="tool" Content="↑" ToolTip.Tip="Search it earlier" Command="{Binding MoveUpCommand}" />
+                                                                <Button Classes="tool" Content="↓" ToolTip.Tip="Search it later" Command="{Binding MoveDownCommand}" />
+                                                                <Button Classes="tool" Content="{Binding MoveLabel}" ToolTip.Tip="{Binding MoveTip}" Command="{Binding MoveScopeCommand}" />
+                                                                <Button Classes="tool" Content="Edit" Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}" />
+                                                                <Button Classes="tool" Content="Save" Command="{Binding SaveEditCommand}" IsVisible="{Binding IsEditing}" />
+                                                                <Button Classes="tool" Content="Remove" ToolTip.Tip="Take it out of the PATH" Command="{Binding RemoveCommand}" />
+                                                            </StackPanel>
+                                                            <Button Classes="link" FontSize="11.5" Margin="34,0,0,0" HorizontalAlignment="Left"
+                                                                    Content="Put it back" Command="{Binding PutBackCommand}" IsVisible="{Binding CanPutBack}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="6,0">
+                            <TextBox Grid.Column="0" Text="{Binding NewEntryText}" PlaceholderText="Add a folder, e.g. C:\Program Files\Tool\bin"
+                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                                     AutomationProperties.Name="New entry">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <ToggleButton Grid.Column="1" Classes="chip" IsChecked="{Binding NewEntryInUser}" VerticalAlignment="Center"
+                                          ToolTip.Tip="On: your user PATH. Off: the machine PATH (needs admin)">
+                                <Panel>
+                                    <TextBlock Text="to my user PATH" IsVisible="{Binding NewEntryInUser}" />
+                                    <TextBlock Text="to the machine PATH" IsVisible="{Binding !NewEntryInUser}" />
+                                </Panel>
+                            </ToggleButton>
+                            <Button Grid.Column="2" Classes="secondary" Content="Add" Command="{Binding AddCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
 
             <!-- Right: what applying would change. -->
             <Border Grid.Column="1" Classes="panel" Padding="0">

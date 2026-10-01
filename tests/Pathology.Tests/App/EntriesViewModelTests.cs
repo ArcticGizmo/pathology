@@ -50,14 +50,16 @@ public class EntriesViewModelTests
     }
 
     [Fact]
-    public void Toggling_expanded_switches_every_row_to_the_stored_text()
+    public void A_row_shows_the_stored_text_and_its_expansion_only_when_that_differs()
     {
         var vm = Page();
-        var row = Row(vm, PathScope.User, @"C:\Users\you\AppData\Local\Microsoft\WindowsApps");
+        var expands = Row(vm, PathScope.User, @"C:\Users\you\AppData\Local\Microsoft\WindowsApps");
+        var plain = Row(vm, PathScope.Machine, @"C:\Tools");
 
-        vm.ShowExpanded = false;
-
-        Assert.Equal(@"%USERPROFILE%\AppData\Local\Microsoft\WindowsApps", row.Text);
+        Assert.Equal(@"%USERPROFILE%\AppData\Local\Microsoft\WindowsApps", expands.Text);
+        Assert.True(expands.HasExpanded);
+        Assert.Equal(@"C:\Users\you\AppData\Local\Microsoft\WindowsApps", expands.Expanded);
+        Assert.False(plain.HasExpanded);
     }
 
     [Fact]
