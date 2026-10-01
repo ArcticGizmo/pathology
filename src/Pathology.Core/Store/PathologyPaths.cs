@@ -12,6 +12,12 @@ public interface IPathologyPaths
 
     /// <summary>The user-settings file.</summary>
     string SettingsFile { get; }
+
+    /// <summary>One record per apply: the backup of what each changed, and what happened.</summary>
+    string HistoryDirectory { get; }
+
+    /// <summary>Where a batch for the elevated helper is handed over (and its result handed back).</summary>
+    string PendingDirectory { get; }
 }
 
 /// <summary>Filesystem implementation of <see cref="IPathologyPaths"/>.</summary>
@@ -23,4 +29,6 @@ public sealed class PathologyPaths : IPathologyPaths
 
     public string Root { get; }
     public string SettingsFile => Path.Combine(Root, "settings.json");
+    public string HistoryDirectory => Path.Combine(Root, "history");
+    public string PendingDirectory => Path.Combine(Root, "pending");
 }
