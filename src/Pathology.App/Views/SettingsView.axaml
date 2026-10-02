@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             x:Class="Pathology.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="680" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="20">
+
+            <StackPanel Spacing="3">
+                <TextBlock Classes="pagetitle" Text="Settings" />
+                <TextBlock Classes="help" Text="How PATHology behaves." />
+            </StackPanel>
+
+            <!-- Scanning -->
+            <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="SCANNING" />
+                    <CheckBox IsChecked="{Binding ScanOnLaunch}" Content="Scan when PATHology opens"
+                              Foreground="{DynamicResource FgBrush}" />
+                    <TextBlock Classes="help"
+                               Text="A scan is read-only: it reads the registry and each folder's permissions, and writes nothing." />
+
+                    <CheckBox IsChecked="{Binding ProbeNetworkPaths}" Margin="0,8,0,0"
+                              Content="Probe network paths (UNC shares and mapped drives)"
+                              Foreground="{DynamicResource FgBrush}" />
+                    <TextBlock Classes="help" TextWrapping="Wrap"
+                               Text="Off by default. Opening \\host\share signs in to that host with your Windows credentials, and whoever runs it can capture a crackable hash of your password. While off, network entries are judged from their text alone." />
+                </StackPanel>
+            </Border>
+
+            <!-- Changelog -->
+            <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="CHANGELOG" />
+                    <CheckBox IsChecked="{Binding ShowChangelogOnUpdate}"
+                              Content="Show what's new after an update"
+                              Foreground="{DynamicResource FgBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Export -->
+            <Border Classes="panel">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="phead" Text="BUG REPORTS" />
+                    <TextBlock Classes="help" TextWrapping="Wrap"
+                               Text="Save the latest scan as a file to attach to an issue. It's redacted first: your username, SIDs, this PC's name, profile folders and network hosts become placeholders, and it isn't written if anything identifying is left." />
+                    <Button Classes="secondary" HorizontalAlignment="Left" Content="Export a redacted snapshot…"
+                            IsEnabled="{Binding CanExport}" Click="OnExport" />
+                    <SelectableTextBlock Text="{Binding ExportStatus}" FontSize="12" TextWrapping="Wrap"
+                                         Classes="status" Classes.err="{Binding ExportFailed}"
+                                         Classes.ok="{Binding !ExportFailed}"
+                                         IsVisible="{Binding HasExportStatus}" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

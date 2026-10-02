@@ -1,0 +1,164 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+        x:Class="Pathology.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1280" Height="820"
+        MinWidth="820" MinHeight="520"
+        Background="{DynamicResource FormBgBrush}"
+        Title="PATHology">
+
+    <Window.Styles>
+        <!-- Left-nav items: chromeless buttons whose inner Border carries hover + active state. -->
+        <Style Selector="Button.nav">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.nav:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.navitem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="Border.navitem > Grid > TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource NavItemTextBrush}" />
+        </Style>
+        <Style Selector="Button.nav:pointerover Border.navitem">
+            <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+        </Style>
+        <Style Selector="Border.navitem.active">
+            <Setter Property="Background" Value="{DynamicResource NavItemActiveBgBrush}" />
+        </Style>
+        <Style Selector="Border.navitem.active > Grid > TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource NavItemActiveTextBrush}" />
+        </Style>
+        <!-- A page under a group ("System" under "Entries"): indented, so the group reads as its parent. -->
+        <Style Selector="Button.nav.nested">
+            <Setter Property="Margin" Value="14,1,0,1" />
+        </Style>
+        <!-- The group row itself: never filled, but its label brightens while one of its pages is showing. -->
+        <Style Selector="Border.navitem.group.open > Grid > TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource NavItemActiveTextBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="200,*">
+
+        <!-- Left nav -->
+        <Border Grid.Column="0" Background="{DynamicResource NavBgBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="18,20,18,18">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="pathology" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TitleBrush}" />
+                        <!-- Dev instances write to a separate store; flag it so it's obvious at a glance. -->
+                        <TextBlock Text="- DEV" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource DevBrush}" IsVisible="{Binding IsDevInstance}" />
+                    </StackPanel>
+                    <TextBlock Text="windows PATH health"
+                               Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,6,0,0" />
+                </StackPanel>
+
+                <!-- Pinned to the bottom of the nav, below the diagnostic pages -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="8,4,8,10" Spacing="2">
+                    <!-- Update call-to-action: accented, above Settings, shown only when a newer release exists.
+                         It routes to About, where the download/install/restart happens. -->
+                    <Button Classes="primary" IsVisible="{Binding HasUpdate}"
+                            Command="{Binding ShowUpdateCommand}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            CornerRadius="8" Padding="10,8" Margin="0,2,0,8">
+                        <TextBlock Text="{Binding UpdateButtonLabel}" />
+                    </Button>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="4,0,4,4" />
+                    <Button Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="{Binding Learn}"
+                            AutomationProperties.AutomationId="nav:Learn">
+                        <Border Classes="navitem" Classes.active="{Binding Learn.IsActive}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="navlabel" Text="Learn" FontSize="14"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Button>
+                    <Button Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="{Binding Settings}"
+                            AutomationProperties.AutomationId="nav:Settings">
+                        <Border Classes="navitem" Classes.active="{Binding Settings.IsActive}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="navlabel" Text="Settings" FontSize="14"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Button>
+                    <Button Classes="nav" Command="{Binding NavigateCommand}" CommandParameter="{Binding About}"
+                            AutomationProperties.AutomationId="nav:About">
+                        <Border Classes="navitem" Classes.active="{Binding About.IsActive}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="navlabel" Text="About" FontSize="14"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding About.Version}" FontSize="11"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                            </Grid>
+                        </Border>
+                    </Button>
+                </StackPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding NavItems}" Margin="8,4">
+                        <ItemsControl.DataTemplates>
+                            <!-- A group ("Entries"): opens its first page; its pages follow it, indented. -->
+                            <DataTemplate DataType="vm:NavGroupViewModel">
+                                <Button Classes="nav"
+                                        AutomationProperties.AutomationId="{Binding Label, StringFormat='nav:{0}'}"
+                                        Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).OpenGroupCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Border Classes="navitem group" Classes.open="{Binding IsActive}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Classes="navlabel" Text="{Binding Label}"
+                                                       FontSize="14" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                            <!-- Navigable page (matches any PageViewModel subclass) -->
+                            <DataTemplate DataType="vm:PageViewModel">
+                                <Button Classes="nav" Classes.nested="{Binding IsNested}"
+                                        AutomationProperties.AutomationId="{Binding Title, StringFormat='nav:{0}'}"
+                                        Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).NavigateCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Border Classes="navitem" Classes.active="{Binding IsActive}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Classes="navlabel" Text="{Binding Title}"
+                                                       FontSize="14" VerticalAlignment="Center" />
+                                            <Border Grid.Column="1" IsVisible="{Binding ShowNavCount}"
+                                                    Background="{DynamicResource ButtonBgBrush}" CornerRadius="10"
+                                                    Padding="7,1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding NavCount}" FontSize="11"
+                                                           Foreground="{DynamicResource MutedBrush}" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- Content -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="0" />
+    </Grid>
+</Window>

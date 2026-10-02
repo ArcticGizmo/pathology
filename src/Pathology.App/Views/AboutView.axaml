@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             x:Class="Pathology.App.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="680" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="20">
+
+            <StackPanel Spacing="3">
+                <TextBlock Classes="pagetitle" Text="About" />
+                <TextBlock Classes="help"
+                           Text="Diagnose, explain and fix security and correctness problems in the Windows PATH." />
+            </StackPanel>
+
+            <Border Classes="panel">
+                <StackPanel Spacing="14">
+                    <TextBlock Classes="phead" Text="VERSION" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="PATHology" Classes="field" />
+                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}" Classes="mono" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="secondary" Content="Check for updates"
+                                Command="{Binding CheckForUpdatesCommand}" />
+                        <Button Classes="primary" Content="Download &amp; install"
+                                Command="{Binding ApplyUpdateCommand}"
+                                IsVisible="{Binding UpdateAvailable}" />
+                        <Button Classes="secondary" Content="View changelog"
+                                Command="{Binding ViewChangelogCommand}" />
+                    </StackPanel>
+                    <TextBlock Classes="help" Text="{Binding UpdateStatus}"
+                               IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="panel">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="phead" Text="LINKS" />
+                    <StackPanel Spacing="10">
+                        <Button Classes="link" HorizontalAlignment="Left"
+                                Content="GitHub repository" Command="{Binding OpenRepoCommand}" />
+                        <Button Classes="link" HorizontalAlignment="Left"
+                                Content="Report an issue on GitHub" Command="{Binding OpenIssuesCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

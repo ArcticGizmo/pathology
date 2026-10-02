@@ -1,0 +1,163 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:views="clr-namespace:Pathology.App.Views"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="controls|CharWrapTextBlock.help">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="980" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="18">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="3">
+                    <TextBlock Classes="pagetitle" Text="Dashboard" />
+                    <TextBlock Classes="help"
+                               Text="How safe, correct and tidy this PC's PATH is, and what can be done about it. Each category is rated by its worst problem, so fixing the worst always shows." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
+                        Content="{Binding RescanLabel}" Command="{Binding RescanCommand}" />
+            </Grid>
+
+            <views:ScanStatusPanel />
+
+            <!-- The three ratings, side by side. No overall verdict: they stand on their own. -->
+            <ItemsControl ItemsSource="{Binding Cards}" IsVisible="{Binding HasResult}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3" ColumnSpacing="14" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CategoryCardViewModel">
+                        <Border Classes="panel" Padding="20,14">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="phead" Text="{Binding Heading}" />
+                                <TextBlock Text="{Binding RatingWord}" FontSize="26" FontWeight="Bold"
+                                           LetterSpacing="1" Foreground="{Binding RatingBrush}" />
+                                <TextBlock Text="{Binding CountsLine}" Classes="field" />
+                                <TextBlock Text="{Binding HintLine}" Classes="help" IsVisible="{Binding !IsClean}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- What PATHology can fix: each opens its entry, where the fix is staged. -->
+            <Border Classes="panel" IsVisible="{Binding HasToFix}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="phead" Text="THINGS TO FIX" />
+                    <TextBlock Classes="help" Text="{Binding ToFixLine}" />
+                    <ItemsControl ItemsSource="{Binding ToFix}" Margin="-8,4,-8,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DashboardItemViewModel">
+                                <Button Classes="row" Command="{Binding ActivateCommand}" Padding="8,7">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
+                                                 Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="{Binding Title}" FontSize="13" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource FgBrush}" />
+                                            <TextBlock Text="{Binding FixLine}" FontSize="11.5" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource MutedBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                                            <Border Classes="pill" IsVisible="{Binding IsStaged}">
+                                                <TextBlock Text="staged" FontSize="10.5" Foreground="{DynamicResource AccentBrush}" />
+                                            </Border>
+                                            <Border Classes="pill">
+                                                <TextBlock Text="{Binding ScopeText}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Clean: say so plainly. -->
+            <Border Classes="panel">
+                <Border.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="IsClean" />
+                        <Binding Path="!HasToFix" />
+                    </MultiBinding>
+                </Border.IsVisible>
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="phead" Text="NOTHING TO FIX" />
+                    <TextBlock Classes="help" Text="Every category is clean. The System and User pages still list each entry, if you want to tidy by hand." />
+                </StackPanel>
+            </Border>
+
+            <!-- What it can only explain: each unfolds to say what to do. -->
+            <Border Classes="panel" IsVisible="{Binding HasWorthKnowing}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="phead" Text="WORTH KNOWING" />
+                    <TextBlock Classes="help" Text="There's no fix PATHology can make for these, so open one to see what to do about it." />
+                    <ItemsControl ItemsSource="{Binding WorthKnowing}" Margin="-8,4,-8,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DashboardItemViewModel">
+                                <StackPanel>
+                                    <Button Classes="row" Command="{Binding ActivateCommand}" Padding="8,7">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top"
+                                                     Margin="0,5,0,0" Fill="{Binding SeverityBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="13" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource FgBrush}" />
+                                            <Border Grid.Column="2" Classes="pill" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding ScopeText}" FontSize="10.5" Foreground="{DynamicResource MutedBrush}" />
+                                            </Border>
+                                        </Grid>
+                                    </Button>
+                                    <StackPanel Margin="26,2,8,10" Spacing="6" IsVisible="{Binding IsExpanded}">
+                                        <controls:CharWrapTextBlock Source="{Binding Why}" Prose="True" Classes="help" />
+                                        <controls:CharWrapTextBlock Source="{Binding Advice}" Prose="True" FontSize="12.5"
+                                                                    Foreground="{DynamicResource FgBrush}" IsVisible="{Binding HasAdvice}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="16">
+                                            <Button Classes="link" FontSize="12" Content="{Binding OpenLabel}"
+                                                    Command="{Binding OpenCommand}" IsVisible="{Binding CanOpen}" />
+                                            <Button Classes="link" FontSize="12" Content="{Binding LearnLabel}"
+                                                    Command="{Binding OpenLearnCommand}" IsVisible="{Binding HasLearn}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="8" IsVisible="{Binding HasResult}">
+                <TextBlock Classes="help" Text="{Binding SummaryLine}" />
+                <ToggleButton x:Name="ScanInfoToggle" Classes="disclosure" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Classes="chevron" Text="▸" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="What the scan looked at" FontSize="12" />
+                    </StackPanel>
+                </ToggleButton>
+                <Border Classes="panel" IsVisible="{Binding #ScanInfoToggle.IsChecked}">
+                    <ItemsControl ItemsSource="{Binding ScanInfo}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:InfoRowViewModel">
+                                <Grid ColumnDefinitions="150,*" Margin="0,3">
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" Classes="help" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="field" TextWrapping="Wrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pathology.Core/Pathology.Core.csproj" />
+    <Project Path="src/Pathology.Windows/Pathology.Windows.csproj" />
+    <Project Path="src/Pathology.App/Pathology.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pathology.Tests/Pathology.Tests.csproj" />
+    <Project Path="tests/Pathology.Windows.Tests/Pathology.Windows.Tests.csproj" />
+  </Folder>
+</Solution>

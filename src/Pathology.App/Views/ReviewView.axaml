@@ -1,0 +1,248 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.ReviewView"
+             x:DataType="vm:ReviewViewModel">
+
+    <UserControl.Styles>
+        <!-- Common.axaml's .help/.field match TextBlock exactly; the notes here are CharWrapTextBlocks. -->
+        <Style Selector="controls|CharWrapTextBlock.help">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
+        <Style Selector="controls|CharWrapTextBlock.field">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="860" Margin="32,36,32,32" HorizontalAlignment="Stretch" Spacing="16">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="3">
+                    <TextBlock Classes="pagetitle" Text="Review" />
+                    <TextBlock Classes="help"
+                               Text="What you staged on the System and User pages, and what applying it would change. Nothing is written until you apply, and a backup goes into History first so you can undo it." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top" Margin="16,0,0,0"
+                        Content="← Back to entries" Command="{Binding BackCommand}" />
+            </Grid>
+
+            <!-- How the last apply went. -->
+            <Border Classes="panel" IsVisible="{Binding HasApplyStatus}">
+                <StackPanel Spacing="6">
+                    <SelectableTextBlock Text="{Binding ApplyStatus}" FontSize="13" TextWrapping="Wrap"
+                                         Classes="status" Classes.err="{Binding ApplyFailed}" Classes.ok="{Binding !ApplyFailed}" />
+                    <ItemsControl ItemsSource="{Binding ApplySteps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:StepRowViewModel">
+                                <Grid ColumnDefinitions="64,*" Margin="0,2">
+                                    <TextBlock Grid.Column="0" Text="{Binding Status}" FontSize="11.5" Foreground="{Binding Brush}" />
+                                    <StackPanel Grid.Column="1" Spacing="1">
+                                        <controls:CharWrapTextBlock Source="{Binding Target}" Classes="mono" FontSize="11.5" />
+                                        <controls:CharWrapTextBlock Source="{Binding Message}" Prose="True" Classes="help"
+                                                                    FontSize="11" IsVisible="{Binding HasMessage}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- What's staged: each fix can be unstaged here; edits are undone on their line. -->
+            <Border Classes="panel">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="phead" Text="STAGED" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="link" FontSize="12" Content="Discard everything"
+                                Command="{Binding DiscardCommand}" />
+                    </Grid>
+                    <TextBlock Text="{Binding Summary}" Classes="field" />
+                    <ItemsControl ItemsSource="{Binding Staged}" IsVisible="{Binding HasStagedFixes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FixRowViewModel">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,3">
+                                    <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top" Margin="0,5,0,0"
+                                             Fill="{Binding SeverityBrush}" />
+                                    <StackPanel Grid.Column="1" Spacing="1">
+                                        <controls:CharWrapTextBlock Source="{Binding Title}" Prose="True" Classes="field" FontSize="12.5" />
+                                        <controls:CharWrapTextBlock Source="{Binding Problem}" Prose="True" Classes="help" FontSize="11.5" />
+                                        <controls:CharWrapTextBlock Source="{Binding Note}" Prose="True" FontSize="11.5"
+                                                                    Foreground="{DynamicResource WarnBrush}" IsVisible="{Binding HasNote}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Classes="link" FontSize="12" VerticalAlignment="Top" Content="Unstage"
+                                            Command="{Binding ToggleCommand}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding EditsLine}" Classes="help" IsVisible="{Binding HasEdits}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="panel">
+                <StackPanel DataContext="{Binding Plan}" x:DataType="vm:PlanViewModel" Spacing="16">
+
+                    <TextBlock Classes="phead" Text="WHAT CHANGES" />
+                    <TextBlock Classes="help" IsVisible="{Binding !HasChanges}"
+                               Text="Nothing yet: stage a fix or change an entry on the System or User page to see what it would do." />
+
+                    <!-- The ratings, now and after. -->
+                    <ItemsControl ItemsSource="{Binding Ratings}" IsVisible="{Binding HasChanges}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RatingChangeViewModel">
+                                <Grid ColumnDefinitions="110,Auto,Auto,Auto" ColumnSpacing="10" Margin="0,2">
+                                    <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="help" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Before}" FontWeight="Bold" FontSize="13"
+                                               LetterSpacing="1" Foreground="{Binding BeforeBrush}" />
+                                    <TextBlock Grid.Column="2" Text="→" Foreground="{DynamicResource MutedBrush}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding After}" FontWeight="Bold" FontSize="13"
+                                               LetterSpacing="1" Foreground="{Binding AfterBrush}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding ResolvedLine}" Classes="field" IsVisible="{Binding HasResolved}" />
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasIntroduced}">
+                        <TextBlock Classes="phead" Text="NEW PROBLEMS IT WOULD CAUSE" />
+                        <ItemsControl ItemsSource="{Binding Introduced}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:IntroducedViewModel">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,2">
+                                        <Ellipse Grid.Column="0" Width="8" Height="8" VerticalAlignment="Top" Margin="0,5,0,0"
+                                                 Fill="{Binding Brush}" />
+                                        <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding Title}" Prose="True" Classes="field" FontSize="12.5" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Each value, as a short diff. -->
+                    <ItemsControl ItemsSource="{Binding Values}" IsVisible="{Binding HasValues}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ValueDiffViewModel">
+                                <StackPanel Spacing="4" Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Classes="phead" Text="{Binding Heading}" />
+                                        <TextBlock Classes="help" Text="{Binding LengthLine}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding KindLine}" Classes="field" FontSize="12" IsVisible="{Binding HasKindLine}" />
+                                    <ItemsControl ItemsSource="{Binding Lines}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:DiffLineViewModel">
+                                                <Grid ColumnDefinitions="18,*" Margin="0,1">
+                                                    <TextBlock Grid.Column="0" Text="{Binding Marker}" Foreground="{Binding Brush}"
+                                                               FontWeight="Bold" Classes="mono" />
+                                                    <StackPanel Grid.Column="1">
+                                                        <controls:CharWrapTextBlock Source="{Binding Text}" Classes="mono" Foreground="{Binding Brush}" />
+                                                        <controls:CharWrapTextBlock Source="{Binding Note}" Prose="True" Classes="help" FontSize="11"
+                                                                                    IsVisible="{Binding HasNote}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding UnchangedLine}" Classes="help" IsVisible="{Binding HasUnchanged}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Each folder's permissions. -->
+                    <StackPanel Spacing="6" IsVisible="{Binding HasAcls}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Classes="phead" Text="FOLDER PERMISSIONS" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="link" FontSize="12" Content="Copy as icacls commands"
+                                    Click="OnCopyCommands" IsVisible="{Binding HasCommandsText}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Acls}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AclChangeViewModel">
+                                    <StackPanel Spacing="3" Margin="0,0,0,10">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <controls:CharWrapTextBlock Grid.Column="0" Source="{Binding Path}" Classes="mono" />
+                                            <Border Grid.Column="1" Classes="pill" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding Badge}" FontSize="10.5" Foreground="{Binding BadgeBrush}" />
+                                            </Border>
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Lines}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,1">
+                                                        <TextBlock Grid.Column="0" Text="–" Foreground="{DynamicResource MutedBrush}" />
+                                                        <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding}" Prose="True"
+                                                                                    FontSize="12" Foreground="{DynamicResource FgBrush}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <controls:CharWrapTextBlock Source="{Binding Note}" Prose="True" Classes="help" FontSize="11.5"
+                                                                    IsVisible="{Binding HasNote}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Which commands would run something else. -->
+                    <StackPanel Spacing="4" IsVisible="{Binding HasCommands}">
+                        <TextBlock Classes="phead" Text="COMMANDS THAT WOULD RUN SOMETHING ELSE" />
+                        <ItemsControl ItemsSource="{Binding Commands}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CommandChangeViewModel">
+                                    <Grid ColumnDefinitions="90,*" Margin="0,3">
+                                        <TextBlock Grid.Column="0" Text="{Binding Command}" Classes="mono" Foreground="{Binding Brush}"
+                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Grid.Column="1" Spacing="1">
+                                            <controls:CharWrapTextBlock Source="{Binding Before}" Classes="mono" FontSize="11.5"
+                                                                        Foreground="{DynamicResource MutedBrush}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Text="→" Foreground="{DynamicResource MutedBrush}" FontSize="11.5" />
+                                                <controls:CharWrapTextBlock Source="{Binding After}" Classes="mono" FontSize="11.5" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding MoreCommands}" Classes="help" IsVisible="{Binding HasMoreCommands}" />
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding Problems}" IsVisible="{Binding HasProblems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" Classes="status err" TextWrapping="Wrap" FontSize="12.5" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="{Binding AdminLine}" Classes="field" FontSize="12.5" TextWrapping="Wrap"
+                               IsVisible="{Binding HasChanges}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Apply, then confirm. -->
+            <StackPanel Spacing="10">
+                <Button Classes="primary" HorizontalAlignment="Left" Content="Apply…" Command="{Binding ApplyCommand}"
+                        IsVisible="{Binding !IsConfirming}" />
+                <Border Classes="panel" IsVisible="{Binding IsConfirming}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Apply these changes?" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" />
+                        <TextBlock Classes="help" TextWrapping="Wrap"
+                                   Text="First a backup of each PATH value and each folder's permissions goes into History. Then the parts that need an administrator are applied behind one UAC prompt, and the rest as you. Each write is read back to check it. New programs get the new PATH; ones already open keep the old one until restarted." />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Classes="primary" Content="Apply now" Command="{Binding ConfirmCommand}" />
+                            <Button Classes="secondary" Content="Cancel" Command="{Binding CancelApplyCommand}" />
+                            <TextBlock Text="Applying…" Classes="help" VerticalAlignment="Center" IsVisible="{Binding IsApplying}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

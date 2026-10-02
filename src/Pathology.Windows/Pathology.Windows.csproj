@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Every OS read PATHology makes: registry, environment blocks, tokens, security descriptors, AuthZ.
+       Each sits behind a Pathology.Core interface so the engine above it is testable with fakes. Nothing in
+       here writes: see CLAUDE.md, "A scan is side-effect free". -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pathology.Windows.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pathology.Core\Pathology.Core.csproj" />
+  </ItemGroup>
+
+</Project>

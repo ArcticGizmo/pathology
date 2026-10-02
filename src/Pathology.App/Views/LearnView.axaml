@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.LearnView"
+             x:DataType="vm:LearnViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="32,36,32,24">
+
+        <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,16">
+            <TextBlock Classes="pagetitle" Text="Learn" />
+            <TextBlock Classes="help"
+                       Text="Short notes on how Windows really finds commands and DLLs, and why the findings say what they do." />
+        </StackPanel>
+
+        <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14">
+
+            <Border Grid.Column="0" Classes="panel" Padding="6">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Articles}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LearnArticleRowViewModel">
+                                <Button Classes="row" Classes.selected="{Binding IsSelected}"
+                                        Command="{Binding OpenCommand}" Padding="10,8" Margin="0,1">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Summary}" FontSize="11.5"
+                                                   Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Classes="panel" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel DataContext="{Binding Selected}" x:DataType="vm:LearnArticleRowViewModel"
+                                Margin="26,22" MaxWidth="720" HorizontalAlignment="Left">
+                        <TextBlock Text="{Binding Title}" FontSize="21" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TitleBrush}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Summary}" Classes="help" FontSize="13" Margin="0,0,0,16" />
+                        <controls:MarkdownBlock Markdown="{Binding Markdown}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

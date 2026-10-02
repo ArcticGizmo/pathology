@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Pathology.App.ViewModels"
+             xmlns:controls="clr-namespace:Pathology.App.Controls"
+             x:Class="Pathology.App.Views.HistoryView"
+             x:DataType="vm:HistoryViewModel">
+
+    <UserControl.Styles>
+        <!-- Common.axaml's .help/.field match TextBlock exactly; the notes here are CharWrapTextBlocks. -->
+        <Style Selector="controls|CharWrapTextBlock.help">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        </Style>
+        <Style Selector="controls|CharWrapTextBlock.field">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" Margin="32,36,32,24">
+
+        <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,16">
+            <TextBlock Classes="pagetitle" Text="History" />
+            <TextBlock Classes="help"
+                       Text="An audit log of every change PATHology has made, newest first. Each one keeps what it replaced, so Undo puts it back. An undo is a change too, and shows up here." />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" Classes="help" IsVisible="{Binding IsEmpty}"
+                   Text="Nothing has been changed yet. Changes you stage on the System and User pages and apply from Review appear here, with a way to undo each one." />
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,1.3*" ColumnSpacing="14" IsVisible="{Binding !IsEmpty}">
+
+            <Border Grid.Column="0" Classes="panel" Padding="6" MaxWidth="{StaticResource ListPaneMaxWidth}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HistoryRowViewModel">
+                                <Button Classes="row" Classes.selected="{Binding IsSelected}"
+                                        Command="{Binding OpenCommand}" Padding="10,8" Margin="0,1">
+                                    <StackPanel Spacing="3">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <TextBlock Grid.Column="0" Text="{Binding Summary}" FontSize="13"
+                                                       Foreground="{DynamicResource FgBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Column="1" Text="{Binding OutcomeWord}" FontSize="10.5" FontWeight="SemiBold"
+                                                       LetterSpacing="1" Foreground="{Binding OutcomeBrush}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding When}" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Classes="panel" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="22,20" Spacing="16" IsVisible="{Binding HasSelection}">
+
+                        <StackPanel DataContext="{Binding Detail}" x:DataType="vm:HistoryDetailViewModel" Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding OutcomeWord}" FontSize="11" FontWeight="SemiBold" LetterSpacing="1"
+                                           Foreground="{Binding OutcomeBrush}" />
+                                <TextBlock Text="{Binding Heading}" FontSize="17" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TitleBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding When}" Classes="help" />
+                                <SelectableTextBlock Text="{Binding Message}" Classes="field" TextWrapping="Wrap"
+                                                     IsVisible="{Binding HasMessage}" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="4" IsVisible="{Binding HasFixes}">
+                                <TextBlock Classes="phead" Text="FIXES" />
+                                <ItemsControl ItemsSource="{Binding Fixes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,1">
+                                                <TextBlock Grid.Column="0" Text="–" Foreground="{DynamicResource MutedBrush}" />
+                                                <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding}" Prose="True" Classes="field" FontSize="12.5" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel Spacing="4" IsVisible="{Binding HasSteps}">
+                                <TextBlock Classes="phead" Text="WHAT HAPPENED" />
+                                <ItemsControl ItemsSource="{Binding Steps}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:StepRowViewModel">
+                                            <Grid ColumnDefinitions="64,*" Margin="0,2">
+                                                <TextBlock Grid.Column="0" Text="{Binding Status}" FontSize="11.5" Foreground="{Binding Brush}" />
+                                                <StackPanel Grid.Column="1" Spacing="1">
+                                                    <controls:CharWrapTextBlock Source="{Binding Target}" Classes="mono" FontSize="11.5" />
+                                                    <controls:CharWrapTextBlock Source="{Binding Message}" Prose="True" Classes="help"
+                                                                                FontSize="11" IsVisible="{Binding HasMessage}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <ItemsControl ItemsSource="{Binding Values}" IsVisible="{Binding HasValues}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ValueRecordViewModel">
+                                        <StackPanel Spacing="4" Margin="0,0,0,12">
+                                            <TextBlock Classes="phead" Text="{Binding Heading}" />
+                                            <TextBlock Classes="help" Text="Before" />
+                                            <controls:CharWrapTextBlock Source="{Binding Before}" Classes="mono" FontSize="11.5"
+                                                                        Foreground="{DynamicResource MutedBrush}" />
+                                            <TextBlock Classes="help" Text="After" Margin="0,4,0,0" />
+                                            <controls:CharWrapTextBlock Source="{Binding After}" Classes="mono" FontSize="11.5" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <StackPanel Spacing="6" IsVisible="{Binding HasAcls}">
+                                <TextBlock Classes="phead" Text="FOLDER PERMISSIONS" />
+                                <ItemsControl ItemsSource="{Binding Acls}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AclChangeViewModel">
+                                            <StackPanel Spacing="3" Margin="0,0,0,8">
+                                                <controls:CharWrapTextBlock Source="{Binding Path}" Classes="mono" />
+                                                <ItemsControl ItemsSource="{Binding Lines}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="x:String">
+                                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,1">
+                                                                <TextBlock Grid.Column="0" Text="–" Foreground="{DynamicResource MutedBrush}" />
+                                                                <controls:CharWrapTextBlock Grid.Column="1" Source="{Binding}" Prose="True"
+                                                                                            FontSize="12" Foreground="{DynamicResource FgBrush}" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding UndoNote}" Classes="help" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <SelectableTextBlock Text="{Binding Status}" FontSize="13" TextWrapping="Wrap" IsVisible="{Binding HasStatus}"
+                                             Classes="status" Classes.err="{Binding StatusFailed}" Classes.ok="{Binding !StatusFailed}" />
+
+                        <StackPanel Spacing="10">
+                            <Button Classes="secondary" HorizontalAlignment="Left" Content="Undo this change…"
+                                    Command="{Binding UndoCommand}" IsVisible="{Binding !IsConfirming}" />
+                            <Border Classes="panel" Background="{DynamicResource FormBgBrush}" IsVisible="{Binding IsConfirming}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Undo this change?" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" />
+                                    <TextBlock Classes="help" TextWrapping="Wrap"
+                                               Text="Each PATH value and folder it changed goes back to what it was before, whatever it is now. If anything has changed it since, that's lost too. The undo is backed up and recorded like any other change." />
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Button Classes="primary" Content="Undo now" Command="{Binding ConfirmUndoCommand}" />
+                                        <Button Classes="secondary" Content="Cancel" Command="{Binding CancelUndoCommand}" />
+                                        <TextBlock Text="Undoing…" Classes="help" VerticalAlignment="Center" IsVisible="{Binding IsUndoing}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

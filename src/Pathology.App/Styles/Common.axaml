@@ -1,0 +1,165 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Page furniture shared by every view: the card, its small-caps heading, help text, field labels,
+         and the primary/secondary buttons. Lives here rather than being restated per view so a change
+         to the look lands everywhere at once.
+
+         Brushes are always DynamicResource: this file is evaluated before the palette is registered
+         (Theming/NordTheme.cs runs in OnFrameworkInitializationCompleted), so a static lookup would find
+         nothing. -->
+
+    <Style Selector="Border.panel">
+        <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,18" />
+    </Style>
+
+    <Style Selector="TextBlock.phead">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="1.5" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.help">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.field">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource FgBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.pagetitle">
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TitleBrush}" />
+    </Style>
+
+    <!-- :is() rather than a bare type selector, because Avalonia matches a type name exactly — a plain
+         "TextBlock.mono" would skip SelectableTextBlock, which derives from it. Anything the user might
+         want to copy (a path, a PATH value) is rendered selectable, so these have to cover both. -->
+    <Style Selector=":is(TextBlock).mono">
+        <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource FgBrush}" />
+    </Style>
+
+    <!-- A small rounded status chip beside a title. -->
+    <Style Selector="Border.pill">
+        <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Padding" Value="8,1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Buttons: .primary is the accented call to action, .secondary the neutral one, .danger destructive. -->
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    </Style>
+    <Style Selector="Button.secondary">
+        <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ButtonNeutralHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+    </Style>
+    <Style Selector="Button.danger">
+        <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <!-- .link reads as a text hyperlink, not a chip: accented text, no chrome, underlined on hover. -->
+    <Style Selector="Button.link">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+        <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+    </Style>
+
+    <!-- .row is a clickable list row: no chrome, a soft hover, content stretched across. .row.selected marks the
+         row a master/detail page is showing. -->
+    <Style Selector="Button.row">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+    </Style>
+    <Style Selector="Button.row:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemHoverBrush}" />
+    </Style>
+    <Style Selector="Button.row.selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource NavItemActiveBgBrush}" />
+    </Style>
+
+    <!-- A filter chip: a toggle that reads as a pill, accented when on. -->
+    <Style Selector="ToggleButton.chip">
+        <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="11,4" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ButtonNeutralHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonNeutralTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    </Style>
+
+    <!-- .disclosure folds a section away: a chromeless link-coloured toggle whose chevron turns when it's open.
+         (Fluent's Expander paints its own header, which the palette doesn't reach.) -->
+    <Style Selector="ToggleButton.disclosure">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.disclosure:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.disclosure:pressed /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.disclosure:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.disclosure:checked TextBlock.chevron">
+        <Setter Property="RenderTransform" Value="rotate(90deg)" />
+    </Style>
+
+    <!-- Status text colouring, driven by a bound class. :is() for the same reason as .mono above —
+         status lines carry error text, which is the thing users most want to copy. -->
+    <Style Selector=":is(TextBlock).status.ok"><Setter Property="Foreground" Value="{DynamicResource OkBrush}" /></Style>
+    <Style Selector=":is(TextBlock).status.warn"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></Style>
+    <Style Selector=":is(TextBlock).status.err"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></Style>
+    <Style Selector=":is(TextBlock).status.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+
+</Styles>
