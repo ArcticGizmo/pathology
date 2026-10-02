@@ -42,6 +42,13 @@ public sealed record HostInfo
     /// <c>EnableLinkedConnections</c>: when set, elevated sessions see the user's mapped drives. Null when unset.
     /// </summary>
     public bool? EnableLinkedConnections { get; init; }
+
+    /// <summary>
+    /// Administrator Protection is on (<c>TypeOfAdminApprovalMode</c> = 2): elevating runs as a separate,
+    /// system-managed admin account with its own profile, so your user PATH never reaches elevated programs.
+    /// Null when the policy is unset.
+    /// </summary>
+    public bool? AdministratorProtection { get; init; }
 }
 
 /// <summary>Knobs for one capture.</summary>

@@ -35,9 +35,9 @@ public class PlanProjectionTests
         var outcome = PlanProjection.Project(diagnosis, Changes(diagnosis, fixes.Where(f => f.Recommended)), new LockedEvaluator());
 
         Assert.Equal(Severity.High, outcome.BeforeHealth[FindingCategory.Security].Rating);
-        // What's left is the UAC exposure summary, which has no automatic fix.
-        Assert.Equal(Severity.Medium, outcome.After.Health[FindingCategory.Security].Rating);
-        Assert.Equal("uac-exposure", Assert.Single(outcome.After.Health[FindingCategory.Security].Problems).RootCause);
+        // What's left is the UAC exposure summary, which is a note, not a problem.
+        Assert.True(outcome.After.Health[FindingCategory.Security].IsClean);
+        Assert.Contains(outcome.After.Health.Notes, g => g.RootCause == "uac-exposure");
         Assert.True(outcome.After.Health[FindingCategory.Correctness].IsClean);
         Assert.True(outcome.After.Health[FindingCategory.Hygiene].IsClean);
         Assert.DoesNotContain(outcome.Introduced, g => g.Severity > Severity.Info);

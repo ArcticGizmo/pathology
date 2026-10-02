@@ -56,7 +56,7 @@ public sealed class CaptureTests : IDisposable
 
         Assert.Equal(PathTokeniser.Split(snapshot.MachinePath.Value).Count, snapshot.EntriesIn(PathScope.Machine).Count());
         Assert.Equal(PathTokeniser.Split(snapshot.UserPath.Value).Count, snapshot.EntriesIn(PathScope.User).Count());
-        Assert.Equal(4, snapshot.Perspectives.Count);
+        Assert.Equal(Enum.GetValues<Perspective>().Length, snapshot.Perspectives.Count);
         Assert.False(string.IsNullOrEmpty(snapshot.EffectivePath));
 
         foreach (var entry in snapshot.Entries.Where(e => e.ProbePath is not null))

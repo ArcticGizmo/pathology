@@ -32,16 +32,18 @@ internal static class Severities
         Perspective.CurrentUserElevated => "You, elevated",
         Perspective.System => "SYSTEM",
         Perspective.StandardUser => "A standard user",
+        Perspective.Sandboxed => "A sandboxed program",
         _ => perspective.ToString(),
     };
 
-    /// <summary>The perspective mid-sentence: "you", "you elevated", "SYSTEM", "a standard user".</summary>
+    /// <summary>The perspective mid-sentence: "you", "you elevated", "SYSTEM", "a standard user", "a sandboxed program".</summary>
     public static string PerspectivePhrase(Perspective perspective) => perspective switch
     {
         Perspective.CurrentUserUnelevated => "you",
         Perspective.CurrentUserElevated => "you elevated",
         Perspective.System => "SYSTEM",
         Perspective.StandardUser => "a standard user",
+        Perspective.Sandboxed => "a sandboxed program",
         _ => perspective.ToString(),
     };
 

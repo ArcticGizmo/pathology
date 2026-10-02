@@ -220,7 +220,10 @@ public sealed class WritableBeforeSystem32 : IDetector
             var attacker = Threats.WhoCanPlant(folder);
             if (attacker == Attacker.None) continue;
 
-            var severity = Threats.IsEscalation(attacker, context) ? Severity.High : Severity.Medium;
+            // Only you writing a folder in your own user PATH crosses no boundary: anything running as you could edit
+            // that PATH itself. What's left is a tool you install there quietly replacing a Windows command.
+            var ownFolder = attacker == Attacker.You && entry.Scope == PathScope.User;
+            var severity = ownFolder ? Severity.Low : Threats.IsEscalation(attacker, context) ? Severity.High : Severity.Medium;
             var count = builtins.Count == 0 ? "Every Windows command" : $"{Words.Count(builtins.Count, "Windows command")}";
 
             yield return new Finding
@@ -229,15 +232,22 @@ public sealed class WritableBeforeSystem32 : IDetector
                 Category = FindingCategory.Security,
                 Severity = severity,
                 Subject = folder.Path,
-                RootCause = Threats.WritableRootCause(context, folder),
+                // Locking you out of your own folder isn't the fix, so it doesn't share the lock-down's root cause.
+                RootCause = ownFolder ? "shadow:" + PathText.Key(folder.Path) : Threats.WritableRootCause(context, folder),
                 Title = $"{folder.Path} comes before System32, and {Threats.Who(attacker)} can write to it",
                 What = $"{Words.Entry(entry)} is searched before {context.Entries[system32].Expanded.Trim()}, and " +
                        $"{Threats.Who(attacker)} can add files to it. A command planted here beats the Windows one of the same name.",
                 Why = "cmd and PowerShell look for a bare command folder by folder in PATH order, trying each PATHEXT extension " +
                       "within a folder, so a where.bat or where.com here runs instead of System32's where.exe. " +
                       $"{count} could be replaced this way" +
-                      (named.Count > 0 ? $", including {Words.List(named)}." : "."),
-                Fix = "Move the entry after the Windows folders, and lock it down so only administrators can write to it.",
+                      (named.Count > 0 ? $", including {Words.List(named)}." : ".") +
+                      (ownFolder
+                          ? " Only you can write it, so it gives nobody rights they didn't have: anything running as you could " +
+                            "edit your user PATH anyway. The risk is a tool you install there replacing a Windows command by accident."
+                          : ""),
+                Fix = ownFolder
+                    ? "Move the entry after the Windows folders."
+                    : "Move the entry after the Windows folders, and lock it down so only administrators can write to it.",
                 Scope = entry.Scope,
                 Entries = [EntryRef.Of(entry)],
                 Perspectives = Threats.Perspectives(attacker, entry.Scope),
@@ -307,14 +317,19 @@ public sealed class UserFolderWritableByOthers : IDetector
     };
 }
 
-/// <summary>SEC-07: the UAC exposure summary: folders you can write unelevated that elevated sessions also search.</summary>
+/// <summary>
+/// SEC-07: the UAC exposure summary: folders you can write unelevated that elevated sessions also search. Always a
+/// note: UAC isn't a security boundary, and malware running as you has easier routes into an elevated session (your
+/// user PATH itself, your PowerShell profile), so locking these folders down wouldn't close anything.
+/// </summary>
 public sealed class UacExposure : IDetector
 {
     public string Rule => "SEC-07";
 
     public IEnumerable<Finding> Detect(DetectionContext context)
     {
-        if (!context.HasSplitToken || !context.UserIsAdmin) yield break;
+        // Under Administrator Protection, elevated programs run as another account with its own PATH.
+        if (!context.HasSplitToken || !context.UserIsAdmin || context.ElevatesAsAnotherAccount) yield break;
 
         var exposed = new List<(PathEntry Entry, DirectoryFacts Folder)>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -325,25 +340,27 @@ public sealed class UacExposure : IDetector
         }
         if (exposed.Count == 0) yield break;
 
-        // Windows puts WindowsApps (app execution aliases) in every user's PATH. On its own it's the baseline, not a finding.
+        // Windows puts WindowsApps (app execution aliases) in every user's PATH.
         var onlyStock = exposed.All(e => IsWindowsApps(e.Folder));
 
         yield return new Finding
         {
             Rule = Rule,
             Category = FindingCategory.Security,
-            Severity = onlyStock ? Severity.Info : Severity.Medium,
+            Severity = Severity.Info,
             Subject = "uac",
             RootCause = "uac-exposure",
             Title = $"{Words.Count(exposed.Count, "PATH folder")} you can write without elevating {(exposed.Count == 1 ? "is" : "are")} also searched by your elevated programs",
             What = "Programs you run as administrator inherit your PATH. " +
                    $"{Words.List(exposed.Select(e => e.Folder.Path))} {(exposed.Count == 1 ? "is" : "are")} writable from your normal, unelevated session.",
-            Why = "Malware running as you, without admin rights, could plant a command or DLL in one of them and wait for you to " +
-                  "run something elevated that searches PATH, turning an ordinary infection into an administrator one without " +
-                  "a UAC prompt. Microsoft doesn't treat UAC as a security boundary, but it's the one most PCs rely on." +
+            Why = "Malware running as you could plant a command or DLL in one of them and wait for you to run something elevated. " +
+                  "But these folders don't open that door: the same malware can add a folder of its own to your user PATH, or " +
+                  "hook your PowerShell profile, which elevated PowerShell loads too. Microsoft doesn't treat UAC as a security " +
+                  "boundary, and locking these folders down wouldn't make it one, so this is a note, not a problem." +
                   (onlyStock ? " Here it's only the WindowsApps folder Windows adds for every user, which is the normal baseline." : ""),
-            Fix = "Keep writable tool folders out of PATH where you can, or install tools for all users under Program Files. " +
-                  "For admin work, a separate administrator account keeps your everyday PATH out of elevated sessions.",
+            Fix = "Nothing to fix for its own sake. If you want elevation to be a real boundary, turn on Administrator " +
+                  "Protection (Windows 11 24H2 and later) or do admin work from a separate administrator account: either way, " +
+                  "elevated programs get their own profile and PATH.",
             Entries = exposed.Select(e => EntryRef.Of(e.Entry)).ToList(),
             Perspectives = [Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated],
             Evidence = exposed.Select(e => $"{Words.Entry(e.Entry)}: writable by you, unelevated").ToList(),
@@ -411,6 +428,52 @@ public sealed class WritableLinkTarget : IDetector
                 Entries = [EntryRef.Of(entry)],
                 Perspectives = Threats.Perspectives(attacker, entry.Scope),
                 Evidence = [.. resolved.Links.Select(l => $"{l.Path} → {l.ReparseTarget}"), .. evidence],
+                Learn = LearnTopics.DllSearchOrder,
+            };
+        }
+    }
+}
+
+/// <summary>
+/// SEC-10: a PATH folder that sandboxed, Low-integrity code can add files to. Unlike your own writable folders, this
+/// does cross a boundary: a file planted from inside a sandbox runs outside it.
+/// </summary>
+public sealed class SandboxWritable : IDetector
+{
+    public string Rule => "SEC-10";
+
+    public IEnumerable<Finding> Detect(DetectionContext context)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in context.Entries)
+        {
+            if (context.Resolve(entry).Final is not { Exists: true, IsDirectory: true } folder || !seen.Add(PathText.Key(folder.Path))) continue;
+            var access = folder.AccessFor(Perspective.Sandboxed);
+            if (!Writability.CanPlantFiles(access)) continue;
+
+            var machine = entry.Scope == PathScope.Machine;
+            yield return new Finding
+            {
+                Rule = Rule,
+                Category = FindingCategory.Security,
+                Severity = machine ? Severity.High : Severity.Medium,
+                Subject = folder.Path,
+                RootCause = "label:" + PathText.Key(folder.Path),
+                Title = $"Sandboxed programs can add files to {folder.Path}, which is in {Words.Path(entry.Scope)}",
+                What = $"{Words.Entry(entry)} carries a Low integrity label, so code running in a sandbox (a browser's, a " +
+                       "document reader's) can create files in it.",
+                Why = "A sandbox is there to keep a compromised program away from the rest of your account. A command or DLL " +
+                      "it plants in a PATH folder runs outside the sandbox: as you" +
+                      (machine ? ", and as SYSTEM for services that search the machine PATH." : ", the next time anything searches PATH for it.") +
+                      " That's a sandbox escape, which Windows does treat as a security boundary.",
+                Fix = $"Put the folder back to Medium integrity (icacls \"{folder.Path}\" /setintegritylevel M), or move the " +
+                      @"tools somewhere without the label. Folders under AppData\LocalLow are Low by design and don't belong on PATH.",
+                Scope = entry.Scope,
+                Entries = [EntryRef.Of(entry)],
+                Perspectives = machine
+                    ? [Perspective.Sandboxed, Perspective.System, Perspective.CurrentUserElevated]
+                    : [Perspective.Sandboxed, Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated],
+                Evidence = Writability.EvidenceFor(access, "Sandboxed programs", context.Snapshot.Host.UserSid).ToList(),
                 Learn = LearnTopics.DllSearchOrder,
             };
         }

@@ -38,14 +38,15 @@ public class RealMachineFixtureTests
     {
         var security = Health[FindingCategory.Security];
         Assert.Equal(Severity.High, security.Rating);
-        Assert.Equal((9, 2, 0), (security.Count(Severity.High), security.Count(Severity.Medium), security.Count(Severity.Low)));
+        // The second Medium was the UAC exposure summary, which is a note now.
+        Assert.Equal((9, 1, 0), (security.Count(Severity.High), security.Count(Severity.Medium), security.Count(Severity.Low)));
 
         var correctness = Health[FindingCategory.Correctness];
         Assert.Equal(Severity.High, correctness.Rating);
         Assert.Equal((2, 1, 3), (correctness.Count(Severity.High), correctness.Count(Severity.Medium), correctness.Count(Severity.Low)));
 
         Assert.Equal(Severity.Low, Health[FindingCategory.Hygiene].Rating);
-        Assert.Equal(12, Health.Notes.Count);
+        Assert.Equal(13, Health.Notes.Count);
     }
 
     [Fact]

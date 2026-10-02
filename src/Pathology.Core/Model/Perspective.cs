@@ -19,6 +19,14 @@ public enum Perspective
 
     /// <summary>A synthetic, unprivileged interactive user: the usual attacker.</summary>
     StandardUser,
+
+    /// <summary>
+    /// This user's unelevated token at Low integrity: what sandboxed code (a browser renderer, a protected-mode
+    /// reader, an AppContainer app) starts from. Low integrity can't write anything labelled Medium or above, and an
+    /// unlabelled folder counts as Medium, so it can write only folders labelled Low. An AppContainer is Low
+    /// integrity with a second check on top, so it can write no more than this.
+    /// </summary>
+    Sandboxed,
 }
 
 /// <summary>The attribute bits a token group carries (<c>SE_GROUP_*</c>).</summary>

@@ -5,9 +5,9 @@ using Pathology.Windows.Native;
 namespace Pathology.Windows;
 
 /// <summary>
-/// Builds the four perspectives' SID sets. The current user's two come from real tokens (this process's and
+/// Builds the five perspectives' SID sets. The current user's two come from real tokens (this process's and
 /// its UAC-linked twin, read at identification level, so no elevation is needed); SYSTEM and the standard
-/// user are fixed lists.
+/// user are fixed lists; the sandboxed one is the unelevated token at Low integrity.
 /// </summary>
 public sealed class TokenPerspectives : ITokenPerspectives
 {
@@ -56,8 +56,21 @@ public sealed class TokenPerspectives : ITokenPerspectives
             elevated with { Perspective = Perspective.CurrentUserElevated },
             System,
             StandardUser,
+            Sandboxed(unelevated),
         ];
     }
+
+    /// <summary>
+    /// The unelevated token with its integrity label swapped for Low: what a sandbox lowers a process to. It's
+    /// derived rather than read (no Low-integrity token is created), so it's marked synthetic.
+    /// </summary>
+    public static PerspectiveIdentity Sandboxed(PerspectiveIdentity unelevated) => unelevated with
+    {
+        Perspective = Perspective.Sandboxed,
+        Groups = [.. unelevated.Groups.Where(g => (g.Attributes & GroupAttributes.Integrity) == 0), new(WellKnownSids.LowIntegrity, Label)],
+        Synthetic = true,
+        Note = "Your unelevated token at Low integrity, as a sandboxed program runs.",
+    };
 
     /// <summary>LocalSystem, the account services run as.</summary>
     public static PerspectiveIdentity System { get; } = new()

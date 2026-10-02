@@ -125,6 +125,7 @@ internal sealed class PosedMachine
                 new() { Perspective = Perspective.CurrentUserElevated, UserSid = You, Groups = [.. everyday, .. admin ? new[] { new TokenGroup(WellKnownSids.Administrators, on) } : []] },
                 new() { Perspective = Perspective.System, UserSid = WellKnownSids.LocalSystem, Synthetic = true, Groups = [new(WellKnownSids.Administrators, on), new(WellKnownSids.Everyone, on)] },
                 new() { Perspective = Perspective.StandardUser, UserSid = WellKnownSids.SyntheticStandardUser, Synthetic = true, Groups = everyday },
+                new() { Perspective = Perspective.Sandboxed, UserSid = You, Synthetic = true, Groups = everyday },
             ];
         }
     }
@@ -187,6 +188,10 @@ internal sealed class PosedFolder(string path)
     public PosedFolder WritableByYou() =>
         WritableBy(Perspective.CurrentUserUnelevated, PosedMachine.You, inherited: true).WritableBy(Perspective.CurrentUserElevated, PosedMachine.You, inherited: true);
 
+    /// <summary>Labelled Low integrity: you, and sandboxed code running as you, can add files.</summary>
+    public PosedFolder WritableBySandbox() =>
+        WritableByYou().WritableBy(Perspective.Sandboxed, PosedMachine.You, inherited: true, FileAccessRights.AddFile);
+
     /// <summary>The drive-root shape: Authenticated Users may create folders.</summary>
     public PosedFolder FoldersCreatableByEveryone() =>
         WritableBy(Perspective.StandardUser, WellKnownSids.AuthenticatedUsers, rights: FileAccessRights.AddSubdirectory)
@@ -243,7 +248,7 @@ internal static class PosedMachines
     /// <summary>
     /// A developer's PC that has collected the usual problems: a writable tools folder ahead of System32, a
     /// Python installed at the drive root, a variable only the user defines, a dead folder that anyone could
-    /// create, duplicates, stray quotes and spaces, and two Pythons fighting.
+    /// create, duplicates, stray quotes and spaces, two Pythons fighting, and a LocalLow folder sandboxes can write.
     /// </summary>
     public static PathSnapshot Messy()
     {
@@ -252,7 +257,7 @@ internal static class PosedMachines
             @"C:\Python312\;C:\Python312\Scripts\;C:\Program Files\nodejs\;%JAVA_HOME%\bin;" +
             @"C:\Users\you\AppData\Local\Programs\Microsoft VS Code\bin;C:\OldApp\bin;C:\Program Files\Git\cmd",
             @"%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;C:\Users\you\.dotnet\tools;""C:\Users\you\bin"";" +
-            @"C:\Users\you\scoop\shims ;;");
+            @"C:\Users\you\scoop\shims ;C:\Users\you\AppData\LocalLow\Acme\bin;;");
         m.UserVariables["JAVA_HOME"] = @"C:\Program Files\Eclipse Adoptium\jdk-21";
 
         m.Folder(@"C:\", f => f.FoldersCreatableByEveryone());
@@ -269,6 +274,7 @@ internal static class PosedMachines
         m.Folder(@"C:\Users\you\.dotnet\tools", f => f.WritableByYou().Files("dotnet-ef.exe"));
         m.Folder(@"C:\Users\you\bin", f => f.WritableByYou().Files("jq.exe"));
         m.Folder(@"C:\Users\you\scoop\shims", f => f.WritableByYou().Files("rg.exe", "fd.exe", "7z.exe"));
+        m.Folder(@"C:\Users\you\AppData\LocalLow\Acme\bin", f => f.WritableBySandbox().Files("acme.exe"));
         return m.Snapshot();
     }
 

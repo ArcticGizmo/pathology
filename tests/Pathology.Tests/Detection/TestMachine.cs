@@ -45,6 +45,8 @@ internal sealed class TestMachine
 
     public bool? EnableLinkedConnections { get; set; }
 
+    public bool? AdministratorProtection { get; set; }
+
     /// <summary>What a new process gets. Left null, it's the registry values' expansion (so CFG-01 stays quiet).</summary>
     public string? EffectivePath { get; set; }
 
@@ -74,6 +76,7 @@ internal sealed class TestMachine
         {
             Elevation = Admin ? ElevationType.Limited : ElevationType.Default,
             EnableLinkedConnections = EnableLinkedConnections,
+            AdministratorProtection = AdministratorProtection,
         };
         var perspectives = Perspectives(Admin);
         var evaluator = new FakeEvaluator
@@ -106,6 +109,7 @@ internal sealed class TestMachine
             new() { Perspective = Perspective.CurrentUserElevated, UserSid = You, Groups = [.. everyday, .. admin ? new[] { new TokenGroup(WellKnownSids.Administrators, on) } : []] },
             new() { Perspective = Perspective.System, UserSid = WellKnownSids.LocalSystem, Synthetic = true, Groups = [new(WellKnownSids.Administrators, on), new(WellKnownSids.Everyone, on)] },
             new() { Perspective = Perspective.StandardUser, UserSid = WellKnownSids.SyntheticStandardUser, Synthetic = true, Groups = everyday },
+            new() { Perspective = Perspective.Sandboxed, UserSid = You, Synthetic = true, Groups = [.. everyday, new(WellKnownSids.LowIntegrity, GroupAttributes.Integrity)] },
         ];
     }
 
@@ -144,6 +148,10 @@ internal sealed class FolderSpec(string path)
         WritableBy(Perspective.StandardUser, sid, inherited).WritableBy(Perspective.CurrentUserUnelevated, sid, inherited);
 
     public FolderSpec WritableByYou() => WritableBy(Perspective.CurrentUserUnelevated, TestMachine.You, inherited: true, FileAccessRights.AddFile);
+
+    /// <summary>Labelled Low integrity: writable by you and by sandboxed code running as you.</summary>
+    public FolderSpec WritableBySandbox() =>
+        WritableByYou().WritableBy(Perspective.Sandboxed, TestMachine.You, inherited: true, FileAccessRights.AddFile);
 
     /// <summary>Only folders can be created (the drive-root shape: Authenticated Users may create folders).</summary>
     public FolderSpec FoldersCreatableByEveryone() =>

@@ -28,6 +28,7 @@ public sealed class HostInfoReader : IHostInfoReader
             Elevation = TokenReader.Elevation(token),
             EnableLua = Flag(policy, "EnableLUA"),
             EnableLinkedConnections = Flag(policy, "EnableLinkedConnections"),
+            AdministratorProtection = policy?.GetValue("TypeOfAdminApprovalMode") is int mode ? mode == 2 : null,
         };
     }
 

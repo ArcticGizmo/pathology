@@ -56,6 +56,7 @@ internal sealed class FakePerspectives : ITokenPerspectives
         new() { Perspective = Perspective.CurrentUserElevated, UserSid = "S-1-5-21-111-222-333-1001" },
         new() { Perspective = Perspective.System, UserSid = WellKnownSids.LocalSystem, Synthetic = true },
         new() { Perspective = Perspective.StandardUser, UserSid = WellKnownSids.SyntheticStandardUser, Synthetic = true },
+        new() { Perspective = Perspective.Sandboxed, UserSid = "S-1-5-21-111-222-333-1001", Synthetic = true },
     ];
 }
 

@@ -39,7 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   say what to do about it).
 - **System and User** — each PATH in search order, exactly as stored with what each `%VARIABLE%` expands to
   beneath, stray quotes and spaces picked out where they hide, and, folded away until you want it, who can
-  write each folder from four points of view.
+  write each folder from five points of view.
 - **Shadowing** — type a command, see which file runs and which ones it hides. Windows commands that
   something else is already answering for are listed, which is usually news.
 - **Learn** — seven short articles on how Windows really finds commands and DLLs, linked from the problems
@@ -47,6 +47,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Export a redacted snapshot** from Settings, for bug reports. Script and tool names outside Windows, and
   variable names PATH doesn't use, are swapped for placeholders too, so a bug report doesn't double as a list
   of the projects you work on.
+- **Folders you can write in your own PATH stop counting against you** — malware running as you can already
+  edit your user PATH, or your PowerShell profile, so the folders it could plant in open no new door. The UAC
+  exposure summary is a note now, never a problem, and goes away under Administrator Protection, where
+  elevation has its own PATH anyway. A folder of yours ahead of System32 is Low: an accident waiting to happen,
+  not an attack.
+- **Sandboxed programs** — a fifth point of view: your account at Low integrity, the way a browser or reader
+  sandbox runs. A PATH folder it can write is a way out of the sandbox, and that is a real boundary, so it's
+  reported as one. It's also gratifyingly rare.
 - **A check for System32 missing from PATH**, after it turned out a PC with no PATH at all was rated
   spotless. Technically there was nothing wrong with it. There was nothing there.
 - **An app icon**, crisp at every size, which is more than most PATHs can say.

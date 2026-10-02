@@ -43,6 +43,10 @@ public sealed class DetectionContext
         var elevated = snapshot.IdentityOf(Perspective.CurrentUserElevated);
         UserIsAdmin = elevated?.AllowSids.Contains(WellKnownSids.Administrators, StringComparer.OrdinalIgnoreCase) == true;
         HasSplitToken = snapshot.Host.Elevation is ElevationType.Limited or ElevationType.Full;
+        var unelevated = snapshot.IdentityOf(Perspective.CurrentUserUnelevated);
+        ElevatesAsAnotherAccount = snapshot.Host.AdministratorProtection == true
+            || (elevated is { UserSid.Length: > 0 } && unelevated is { UserSid.Length: > 0 }
+                && !string.Equals(elevated.UserSid, unelevated.UserSid, StringComparison.OrdinalIgnoreCase));
 
         PathExt = (snapshot.PathExt ?? SnapshotCapturer.DefaultPathExt)
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -71,6 +75,12 @@ public sealed class DetectionContext
 
     /// <summary>This logon has a UAC split token, so elevated sessions exist beside unelevated ones.</summary>
     public bool HasSplitToken { get; }
+
+    /// <summary>
+    /// Elevating runs as a different account with its own profile (Administrator Protection), so your user PATH
+    /// and the folders you can write never reach elevated programs.
+    /// </summary>
+    public bool ElevatesAsAnotherAccount { get; }
 
     /// <summary><c>PATHEXT</c>, upper-cased, in precedence order.</summary>
     public IReadOnlyList<string> PathExt { get; }

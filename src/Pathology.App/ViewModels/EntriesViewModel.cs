@@ -507,7 +507,7 @@ internal static class EntryFacts
 
     /// <summary>The perspectives, in the order the details list them.</summary>
     static readonly Perspective[] Perspectives =
-        [Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated, Perspective.System, Perspective.StandardUser];
+        [Perspective.CurrentUserUnelevated, Perspective.CurrentUserElevated, Perspective.System, Perspective.StandardUser, Perspective.Sandboxed];
 
     static string FormText(PathForm form) => form switch
     {

@@ -93,26 +93,29 @@ public sealed unsafe class AccessEvaluator : IAccessEvaluator, IDisposable
     /// <summary>
     /// Mandatory Integrity Control's no-write-up rule. AuthZ doesn't apply it to a context built from SIDs, so
     /// it's applied here: when the folder's label (<c>S:(ML;;NW;;;HI)</c>) is above the perspective's integrity
-    /// level, the write rights are withdrawn whatever the DACL says. A folder with no label counts as Medium,
-    /// which never restricts the Medium-or-higher perspectives PATHology evaluates.
+    /// level, the write rights are withdrawn whatever the DACL says. A folder with no label counts as Medium with
+    /// no-write-up, which restricts only the Low-integrity <see cref="Perspective.Sandboxed"/> view.
     /// </summary>
     static FileAccessRights ApplyIntegrityLabel(FileAccessRights granted, string sddl, PerspectiveIdentity identity)
     {
         const FileAccessRights writes =
             FileAccessRights.AddFile | FileAccessRights.AddSubdirectory | FileAccessRights.WriteExtendedAttributes
             | FileAccessRights.WriteAttributes | FileAccessRights.Delete | FileAccessRights.WriteDac | FileAccessRights.WriteOwner;
+        const uint medium = 0x2000;
 
         var own = identity.Groups.FirstOrDefault(g => (g.Attributes & GroupAttributes.Integrity) != 0);
         if (own is null || IntegrityRid(own.Sid) is not { } level) return granted;
 
+        // The folder's own label (an inherit-only one applies to children only), or Medium when it has none.
+        var (label, noWriteUp) = (medium, true);
         foreach (Match ace in LabelAce.Matches(sddl))
         {
-            var flags = ace.Groups[1].Value;
-            if (flags.Contains("IO", StringComparison.OrdinalIgnoreCase)) continue;   // applies to children only
-            if (!NoWriteUp(ace.Groups[2].Value)) continue;
-            if (IntegrityRid(ace.Groups[3].Value) is { } label && level < label) return granted & ~writes;
+            if (ace.Groups[1].Value.Contains("IO", StringComparison.OrdinalIgnoreCase)) continue;
+            if (IntegrityRid(ace.Groups[3].Value) is not { } rid) continue;
+            (label, noWriteUp) = (rid, NoWriteUp(ace.Groups[2].Value));
+            break;
         }
-        return granted;
+        return noWriteUp && level < label ? granted & ~writes : granted;
     }
 
     static readonly Regex LabelAce = new(@"\(ML;([^;]*);([^;]*);;;([^)]*)\)", RegexOptions.CultureInvariant);

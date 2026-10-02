@@ -46,6 +46,7 @@ public static class Diagnoser
         new UacExposure(),                   // SEC-07
         new WritableLinkTarget(),            // SEC-08
         new FragileLocation(),               // SEC-09
+        new SandboxWritable(),               // SEC-10
         new UserOnlyVariableInMachinePath(), // COR-01
         new VariableInRegSz(),               // COR-02
         new RelativeOrEmptyEntry(),          // COR-03

@@ -9,7 +9,7 @@ public class TokenPerspectivesTests
     readonly IReadOnlyList<PerspectiveIdentity> _perspectives = new TokenPerspectives().Build();
 
     [Fact]
-    public void All_four_perspectives_come_back_in_order()
+    public void All_five_perspectives_come_back_in_order()
     {
         Assert.Equal(Enum.GetValues<Perspective>(), _perspectives.Select(p => p.Perspective));
     }
@@ -49,5 +49,18 @@ public class TokenPerspectivesTests
         Assert.True(standard.Synthetic);
         Assert.DoesNotContain(standard.Groups, g => g.Sid == WellKnownSids.Administrators);
         Assert.Contains(standard.Groups, g => g.Sid == WellKnownSids.Users);
+    }
+
+    [Fact]
+    public void The_sandboxed_view_is_the_unelevated_token_at_Low_integrity()
+    {
+        var unelevated = _perspectives[0];
+        var sandboxed = _perspectives[4];
+
+        Quiet.Same(unelevated.UserSid, sandboxed.UserSid, "the sandboxed user SID");
+        Assert.True(sandboxed.Synthetic);
+        var label = Assert.Single(sandboxed.Groups, g => (g.Attributes & GroupAttributes.Integrity) != 0);
+        Assert.Equal(WellKnownSids.LowIntegrity, label.Sid);
+        Assert.Equal(unelevated.Groups.Count, sandboxed.Groups.Count);
     }
 }

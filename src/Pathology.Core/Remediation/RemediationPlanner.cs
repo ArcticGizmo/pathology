@@ -258,7 +258,7 @@ public static class RemediationPlanner
 
         var lastWindows = machine.Select((e, i) => (e, i)).Last(p => IsWindows(p.e)).i;
         var ahead = machine.Take(lastWindows).Count(e => !IsWindows(e));
-        var risky = diagnosis.Findings.Any(f => f.Rule == "SEC-04");
+        var risky = diagnosis.Findings.Any(f => f.Rule == "SEC-04" && f.Severity > Severity.Low);
         return Fix(
             title: "Search the Windows folders first",
             edits: [new Reorder(PathScope.Machine, windows.Select(w => w.Id).ToList())],

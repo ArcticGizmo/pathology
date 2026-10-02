@@ -143,6 +143,24 @@ public class SecurityDetectorTests
         Assert.Equal(machine.Single("SEC-01").RootCause, finding.RootCause);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SEC04_your_own_user_folder_before_System32_is_low_and_not_locked_down(bool admin)
+    {
+        // System32 in the user PATH is how a user entry ends up ahead of it.
+        var machine = new TestMachine(@"C:\Program Files\Tool", $@"C:\Users\you\bin;%SystemRoot%\system32") { Admin = admin }
+            .Folder(@"C:\Program Files\Tool")
+            .Folder(@"C:\Users\you\bin", f => f.WritableByYou());
+
+        var finding = machine.Single("SEC-04");
+
+        Assert.Equal(Severity.Low, finding.Severity);
+        Assert.Equal(@"shadow:C:\USERS\YOU\BIN", finding.RootCause);
+        Assert.Contains("gives nobody rights", finding.Why);
+        Assert.DoesNotContain("lock it down", finding.Fix);
+    }
+
     [Fact]
     public void SEC04_writable_folders_after_System32_or_a_PATH_without_it_are_not_shadowing_risks()
     {
@@ -228,7 +246,7 @@ public class SecurityDetectorTests
     // SEC-07 ------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void SEC07_folders_you_can_write_unelevated_are_summarised_once()
+    public void SEC07_folders_you_can_write_unelevated_are_summarised_once_as_a_note()
     {
         var machine = new TestMachine(Windows, @"C:\Users\you\bin;C:\Users\you\.cargo\bin")
             .Folder(@"C:\Users\you\bin", f => f.WritableByYou())
@@ -236,9 +254,21 @@ public class SecurityDetectorTests
 
         var finding = machine.Single("SEC-07");
 
-        Assert.Equal(Severity.Medium, finding.Severity);
+        // UAC isn't a boundary, and your own user PATH is an easier way in, so it never rates the category.
+        Assert.Equal(Severity.Info, finding.Severity);
+        Assert.Contains("PowerShell profile", finding.Why);
         Assert.Equal(2, finding.Entries.Count);
         Assert.Equal("uac-exposure", finding.RootCause);
+        Assert.True(Pathology.Core.Health.HealthRater.Rate(machine.Diagnose())[FindingCategory.Security].IsClean);
+    }
+
+    [Fact]
+    public void SEC07_is_not_raised_under_Administrator_Protection()
+    {
+        var machine = new TestMachine(Windows, @"C:\Users\you\bin") { AdministratorProtection = true }
+            .Folder(@"C:\Users\you\bin", f => f.WritableByYou());
+
+        Assert.Empty(machine.Findings("SEC-07"));
     }
 
     [Fact]
@@ -338,5 +368,33 @@ public class SecurityDetectorTests
     public void SEC09_ignores_fixed_drives()
     {
         Assert.Empty(new TestMachine($@"{Windows};C:\Program Files\Tool").Folder(@"C:\Program Files\Tool").Findings("SEC-09"));
+    }
+
+    // SEC-10 ------------------------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(PathScope.User, Severity.Medium)]
+    [InlineData(PathScope.Machine, Severity.High)]
+    public void SEC10_a_folder_sandboxed_code_can_write_is_a_sandbox_escape(PathScope scope, Severity expected)
+    {
+        const string low = @"C:\Users\you\AppData\LocalLow\tool";
+        var machine = (scope == PathScope.Machine ? new TestMachine($@"{Windows};{low}") : new TestMachine(Windows, low))
+            .Folder(low, f => f.WritableBySandbox());
+
+        var finding = machine.Single("SEC-10");
+
+        Assert.Equal(expected, finding.Severity);
+        Assert.Equal(scope, finding.Scope);
+        Assert.Contains("sandbox escape", finding.Why);
+        Assert.Contains("/setintegritylevel M", finding.Fix);
+        Assert.Contains(Perspective.Sandboxed, finding.Perspectives);
+    }
+
+    [Fact]
+    public void SEC10_folders_only_you_can_write_are_not_sandbox_writable()
+    {
+        var machine = new TestMachine(Windows, @"C:\Users\you\bin").Folder(@"C:\Users\you\bin", f => f.WritableByYou());
+
+        Assert.Empty(machine.Findings("SEC-10"));
     }
 }

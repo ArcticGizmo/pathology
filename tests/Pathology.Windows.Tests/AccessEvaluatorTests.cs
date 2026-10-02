@@ -124,6 +124,23 @@ public sealed class AccessEvaluatorTests : IDisposable
     }
 
     [Fact]
+    public void Low_integrity_can_write_only_a_folder_labelled_Low()
+    {
+        const string acl = $"O:BAG:SYD:PAI(A;;FA;;;SY)(A;OICI;FA;;;{Alice})";
+        var sandboxed = TokenPerspectives.Sandboxed(StandardAlice);
+
+        Assert.True(_sut.Evaluate(acl, StandardAlice).CanAddFiles);
+        // No label counts as Medium, which Low can't write up to.
+        Assert.False(_sut.Evaluate(acl, sandboxed).CanPlant);
+        Assert.False(_sut.Evaluate(acl + "S:(ML;;NW;;;ME)", sandboxed).CanPlant);
+        Assert.True(_sut.Evaluate(acl + "S:(ML;OICI;NW;;;LW)", sandboxed).CanAddFiles);
+        // An inherit-only label is for the children; the folder itself is still Medium.
+        Assert.False(_sut.Evaluate(acl + "S:(ML;OICIIO;NW;;;LW)", sandboxed).CanPlant);
+        // The label doesn't change what the Medium view can do.
+        Assert.True(_sut.Evaluate(acl + "S:(ML;OICI;NW;;;LW)", StandardAlice).CanAddFiles);
+    }
+
+    [Fact]
     public void Nothing_granted_is_an_empty_result_not_an_error()
     {
         var result = _sut.Evaluate("O:SYG:SYD:P(A;;FA;;;SY)", Standard);

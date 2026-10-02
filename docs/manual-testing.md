@@ -29,15 +29,16 @@ every user from `C:\`.
 - [ ] The window, title bar and taskbar icon is the PATHology logo, crisp at small sizes.
 
 ### Dashboard
-- [ ] Security **HIGH**, 9 high · 2 medium, "Fix 9 to bring it to Medium".
+- [ ] Security **HIGH**, 9 high · 1 medium, "Fix 9 to bring it to Medium".
 - [ ] Correctness **HIGH**, 2 high · 1 medium · 3 low, "Fix 2 to bring it to Medium".
 - [ ] Hygiene **LOW**, 1 low, "Fix 1 to make it clean".
 - [ ] *Things to fix* leads with SEC-05, "7 PATH folders inherit write access for every user from C:\", fix
       *Lock down the 7 folders…*. The three missing `C:\Android\android-sdk\…` folders are there (High), each
       with a removal. COR-01 names `%NVM_SYMLINK%`.
 - [ ] Clicking one opens its entry on System or User, picked out, with that problem in the panel.
-- [ ] *Worth knowing* has the UAC exposure (about 24 folders) and the length warning (the PATH is about 98% of
-      2,047). Clicking one unfolds what to do; *Show the entry* and the Learn link go where they say.
+- [ ] *Worth knowing* has the length warning (the PATH is about 98% of 2,047). Clicking it unfolds what to do;
+      *Show the entry* and the Learn link go where they say. The UAC exposure (about 24 folders) is a note now, so
+      it shows on the entries it names, not here.
 - [ ] The summary line gives the scan time, the entry counts and the length; *What the scan looked at* unfolds.
 
 ### System and User

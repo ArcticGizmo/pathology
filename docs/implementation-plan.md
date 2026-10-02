@@ -256,7 +256,9 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
 - [x] `SEC-03` Missing machine dir whose nearest existing ancestor is creatable by non-admins (phantom dir) → **High**
 - [x] `SEC-04` Writable entry ordered before `%SystemRoot%\System32` / `%SystemRoot%` → separate **shadowing
       risk** rating. Uses PATHEXT precedence (`.COM`/`.BAT` beat `.EXE`) to list which built-ins could be shadowed.
-      *High (Medium when only an admin's own session can write it). Shares SEC-01's root cause: one lock-down fixes both.*
+      *High (Medium when only an admin's own session can write it). Shares SEC-01's root cause: one lock-down fixes both.
+      **Low** when it's a user PATH folder only you can write: that crosses no boundary (you could edit your user PATH
+      anyway), so it gets its own `shadow:` root cause and no lock-down, just the reorder advice.*
 - [x] `SEC-05` Permissive ACL inherited from a drive root → one root-cause finding covering every affected
       dir. Its children are grouped under it, not reported one by one. *`ProgramData` is a second source (it
       hands Users write access to its subfolders). Windows, Program Files and the profiles are excluded.*
@@ -264,13 +266,23 @@ granting ACE, the contexts that break, a diff) and a `Learn` topic for M4's deep
       *Also a missing user dir that other users could create.*
 - [x] `SEC-07` User-writable dirs reachable from elevated sessions → **UAC exposure summary**
       (a Medium finding plus a Health panel). *Only for an admin with a split token. **Info** when the only
-      exposed folder is the stock `WindowsApps`, so a fresh install isn't marked down.*
+      exposed folder is the stock `WindowsApps`, so a fresh install isn't marked down.* **Changed 2026-10-02: always
+      Info.** UAC isn't a security boundary, and malware running as you can already add its own folder to your user
+      PATH or hook `$PROFILE`, so these folders open no new door and shouldn't rate Security. Not raised at all under
+      Administrator Protection (`TypeOfAdminApprovalMode` = 2, or an elevated token whose user differs), where
+      elevation runs as another account with its own PATH.
 - [x] `SEC-08` Junction or symlink whose **target** is writable → assessed against the target and reported
       at the target's severity, with a "looks safe, isn't" note. *Link entries are judged only here, not by SEC-01/06.*
 - [x] `SEC-09` UNC path, mapped drive letter or removable drive → **Medium**, listing the contexts where
       it breaks or is hijackable (SYSTEM doesn't see mapped drives; elevated sessions don't either unless
       `EnableLinkedConnections` is set). *Also a link to the network and an unmounted drive letter (grouped
       with its COR-05).*
+- [x] `SEC-10` *(added 2026-10-02)* Folder sandboxed code can write → **Medium** (High in the machine PATH): a file
+      planted from inside a sandbox runs outside it, which Windows does treat as a boundary. Judged from a fifth
+      perspective, `Sandboxed`: the unelevated token with its integrity label swapped for Low. The evaluator now
+      treats an unlabelled folder as Medium with no-write-up, so Low can write only folders labelled Low (AppContainers
+      are Low plus a second check, so they can write no more). `label:` root cause, advisory: the fix is restoring the
+      Medium label, which the ACL lock-down doesn't touch.
 
 ### Correctness
 - [x] `COR-01` Machine PATH references a variable defined only at user scope → **High** (error). *Also a
