@@ -50,7 +50,11 @@ public sealed class SecurityDescriptorStoreTests : IDisposable
     [Fact]
     public void Putting_the_old_permissions_back_restores_them_and_inheritance()
     {
-        var folder = _tree.Folder("inherits");
+        // Give the folder something to inherit rather than relying on %TEMP%'s ACL: a CI runner's temp folder can
+        // pass nothing down, so a new folder there gets the token's default DACL and no ID ACEs at all.
+        var parent = _tree.Folder("parent");
+        _tree.SetAcl(parent, $"D:PAI(A;OICI;FA;;;{Me})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;AU)");
+        var folder = _tree.Folder(@"parent\inherits");
         var before = _sut.Read(folder);
         Assert.Contains("ID;", before);
 
