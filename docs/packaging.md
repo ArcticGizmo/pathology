@@ -52,6 +52,10 @@ Releases are automated by [`.github/workflows/release.yml`](../.github/workflows
   `Pathology-win-Setup.exe` is missing, generates `SHA256SUMS.txt` from the exact bytes being uploaded,
   verifies it with `sha256sum -c`, writes it to the step summary, and creates the GitHub Release.
 
+Pull requests run [`.github/workflows/test.yml`](../.github/workflows/test.yml): the same `dotnet test -c Release`
+on windows-latest, read-only, with the same pinned SHAs (bump both files together). A failed run uploads its
+`.trx` results as the `test-results` artifact.
+
 The flow for a release:
 
 1. Run the **`/bump-version`** skill — it sets `<Version>` in `src/Pathology.App/Pathology.App.csproj` and

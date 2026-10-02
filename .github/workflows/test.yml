@@ -1,0 +1,40 @@
+name: Test
+
+on:
+  pull_request:
+
+# Read-only: this builds and tests the PR's code and never needs to write. Actions are pinned to the same
+# commit SHAs as release.yml (the version is in the trailing comment) - bump both files together.
+permissions:
+  contents: read
+
+# A new push to the PR supersedes the run already in flight for it.
+concurrency:
+  group: test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The SDK comes from global.json, so CI builds with the same SDK as a local build.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      # Same configuration as the release build, so a green PR means the tag build's Test step passes too.
+      - name: Test
+        run: dotnet test pathology.slnx -c Release --nologo --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
